@@ -199,6 +199,7 @@ const HORDE_CARDS = {
     name: "Dash Thrusters",
     desc: "Unlock Spacebar Dash. Burst forward with a high-speed surge to escape danger.",
     icon: "⚡",
+    faIcon: "fa-solid fa-bolt-lightning",
     condition: (player, horde) => !player.hasDash,
     apply: (player, horde) => { player.hasDash = true; }
   },
@@ -209,6 +210,7 @@ const HORDE_CARDS = {
     name: "Auto-Dodge Matrix",
     desc: "Evasive cyber-roll automatically triggers when an enemy gets too close (6s cooldown).",
     icon: "🌀",
+    faIcon: "fa-solid fa-wind",
     condition: (player, horde) => !player.hasDodge,
     apply: (player, horde) => { player.hasDodge = true; }
   },
@@ -221,6 +223,7 @@ const HORDE_CARDS = {
     name: "Granny Defense Cannon",
     desc: "Granny statue auto-fires high-power plasma at nearest enemy. Stacking reduces fire delay.",
     icon: "🔱",
+    faIcon: "fa-solid fa-crosshairs",
     condition: (player, horde) => true,
     apply: (player, horde) => {
       horde.grannyTurretLevel = (horde.grannyTurretLevel || 0) + 1;
@@ -233,6 +236,7 @@ const HORDE_CARDS = {
     name: "Core Nanite Repair",
     desc: "Instantly restore the Granny Core back to 100% full health.",
     icon: "🔧",
+    faIcon: "fa-solid fa-screwdriver-wrench",
     condition: (player, horde) => horde.baseHealth < horde.maxBaseHealth,
     apply: (player, horde) => {
       horde.baseHealth = horde.maxBaseHealth;
@@ -245,6 +249,7 @@ const HORDE_CARDS = {
     name: "Bio-Regen Field",
     desc: "Emits a protective rejuvenation ring around Granny that heals nearby players. Stacking increases rate and range.",
     icon: "💚",
+    faIcon: "fa-solid fa-heart-pulse",
     condition: (player, horde) => true,
     apply: (player, horde) => {
       horde.healAuraLevel = (horde.healAuraLevel || 0) + 1;
@@ -259,6 +264,7 @@ const HORDE_CARDS = {
     name: "Reinforced Barricade",
     desc: "Deploy a sturdy defensive wall that blocks enemy pathing and absorbs melee attacks.",
     icon: "🧱",
+    faIcon: "fa-solid fa-shield-halved",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "wall").length < 12,
     apply: (player, horde) => {
       player.pendingPlacements = player.pendingPlacements || [];
@@ -272,6 +278,7 @@ const HORDE_CARDS = {
     name: "Autonomous Sentry",
     desc: "Deploy an automated sentry gun station that fires at approaching enemies within its radius.",
     icon: "📡",
+    faIcon: "fa-solid fa-tower-broadcast",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "turret").length < 6,
     apply: (player, horde) => {
       player.pendingPlacements = player.pendingPlacements || [];
@@ -285,6 +292,7 @@ const HORDE_CARDS = {
     name: "Cryo Freeze Trap",
     desc: "Deploy a floor trap that freezes any enemy walking over it for 5 seconds.",
     icon: "❄️",
+    faIcon: "fa-solid fa-snowflake",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "trap").length < 6,
     apply: (player, horde) => {
       player.pendingPlacements = player.pendingPlacements || [];
@@ -300,6 +308,7 @@ const HORDE_CARDS = {
     name: "Turret Radar Optics",
     desc: "Upgrade all sentry turrets with +70px targeting and firing range.",
     icon: "🔭",
+    faIcon: "fa-solid fa-satellite-dish",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
     apply: (player, horde) => {
       horde.turretRangeBoost = (horde.turretRangeBoost || 0) + 70;
@@ -312,6 +321,7 @@ const HORDE_CARDS = {
     name: "Turret Overclock",
     desc: "Accelerate turret barrel cycling: reduce firing cooldown by 25%.",
     icon: "⚙️",
+    faIcon: "fa-solid fa-gauge-high",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
     apply: (player, horde) => {
       horde.turretCooldownMult = (horde.turretCooldownMult || 1.0) * 0.75;
@@ -324,6 +334,7 @@ const HORDE_CARDS = {
     name: "High-Caliber Rounds",
     desc: "Increase all sentry turret bullet damage by +1.2 per shot.",
     icon: "💥",
+    faIcon: "fa-solid fa-burst",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
     apply: (player, horde) => {
       horde.turretDamageBoost = (horde.turretDamageBoost || 0) + 1.2;
@@ -336,6 +347,7 @@ const HORDE_CARDS = {
     name: "Rapid Cryo Cycling",
     desc: "Reduce trap recovery time after freeze from 5.0s down to 3.2s (or faster).",
     icon: "⏱️",
+    faIcon: "fa-solid fa-clock-rotate-left",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "trap"),
     apply: (player, horde) => {
       horde.trapRecoveryTime = Math.max(1200, (horde.trapRecoveryTime || 5000) - 1300);
@@ -492,6 +504,7 @@ class HordeGame {
           name: rand.name,
           desc: rand.desc,
           icon: rand.icon,
+          faIcon: rand.faIcon,
         });
       }
       for (let i = pool.length - 1; i >= 0; i--) {
