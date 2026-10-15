@@ -1626,7 +1626,7 @@
         box-shadow: 0 0 35px rgba(219, 39, 119, 0.8) !important;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-BTI3Rccv.js"></script>
+    <script type="module" crossorigin src="/assets/index-CX47vV3J.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -1713,6 +1713,10 @@
           <div id="autofire-dock" class="ability-weapon" style="cursor: pointer;" title="Toggle Auto-Fire [Q]">
             <span class="key-badge">Q</span>
             <span id="autofire-dock-label">AUTO: OFF</span>
+          </div>
+          <div id="soundwave-dock" class="ability-weapon hidden" title="Hold L for Earthquake Soundwave">
+            <span class="key-badge">L</span>
+            <span id="soundwave-dock-label">SOUNDWAVE</span>
           </div>
         </div>
 
@@ -1855,7 +1859,7 @@
                 <h3>Mama Cyborg</h3>
                 <span class="lock-indicator" id="mama_cyborg-lock-indicator">🔒 LVL 10 (1000 XP)</span>
               </div>
-              <p>Hyper-velocity chassis. Fires high-speed Vector Plasma that splits into a T after 1 second to flank foes.</p>
+              <p>Hyper-velocity chassis with 2.5x Health & Space Deflect Shield. Fires high-speed Vector Plasma that splits into a T after 1 second.</p>
               <div class="stats">
                 <div class="stat">Speed <span class="meter"><i style="--value:95%"></i></span></div>
                 <div class="stat">Damage <span class="meter"><i style="--value:82%"></i></span></div>
@@ -1884,17 +1888,27 @@
         <div class="settings-body">
           <div class="slider-row">
             <div class="slider-header">
-              <label for="music-volume">Theme Music</label>
-              <output id="music-output">15%</output>
+              <label for="quiet-mode-select">Audio Mode</label>
+              <output id="quiet-mode-status" style="color: var(--accent-cyan); font-weight: 800;">QUIET (DEFAULT)</output>
             </div>
-            <input id="music-volume" type="range" min="0" max="100" value="15" />
+            <select id="quiet-mode-select" class="settings-select">
+              <option value="on" selected>Comfort / Reduced Audio (Default)</option>
+              <option value="off">Full Dynamic Audio</option>
+            </select>
+          </div>
+          <div class="slider-row">
+            <div class="slider-header">
+              <label for="music-volume">Theme Music</label>
+              <output id="music-output">6%</output>
+            </div>
+            <input id="music-volume" type="range" min="0" max="100" value="6" />
           </div>
           <div class="slider-row">
             <div class="slider-header">
               <label for="sound-volume">Combat SFX</label>
-              <output id="sound-output">15%</output>
+              <output id="sound-output">6%</output>
             </div>
-            <input id="sound-volume" type="range" min="0" max="100" value="15" />
+            <input id="sound-volume" type="range" min="0" max="100" value="6" />
           </div>
           <div class="slider-row">
             <div class="slider-header">
@@ -1921,12 +1935,16 @@
               <button type="button" class="keybind-btn" data-action="shoot" id="bind-shoot">E / Left Click</button>
             </div>
             <div class="keybind-item">
-              <span class="keybind-name">Dash / Sigma Shot</span>
+              <span class="keybind-name">Dash / Shield Spiral</span>
               <button type="button" class="keybind-btn" data-action="dash" id="bind-dash">SPACE</button>
             </div>
             <div class="keybind-item">
-              <span class="keybind-name">Dodge / Deflect</span>
+              <span class="keybind-name">Deflect Shield</span>
               <button type="button" class="keybind-btn" data-action="parry" id="bind-parry">R</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Hold Seismic Soundwave</span>
+              <button type="button" class="keybind-btn" data-action="soundwave" id="bind-soundwave">L</button>
             </div>
             <div class="keybind-item">
               <span class="keybind-name">Toggle Auto-Fire</span>

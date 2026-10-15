@@ -15,7 +15,7 @@ const PORT = Number(process.env.PORT || 8080),
   BULLET_LIFETIME = 1800,
   SHOT_COOLDOWN = 320,
   MINIGUN_COOLDOWN = 70,
-  MAX_HEALTH = 10,
+  MAX_HEALTH = 20,
   SPAWN_PROTECTION = 5000,
   DASH_COOLDOWN = 2500,
   DASH_DURATION = 220,
@@ -24,11 +24,14 @@ const PORT = Number(process.env.PORT || 8080),
   PARRY_DURATION = 700,
   PARRY_PADDING = 18;
 const CHARACTER_STATS = {
-  granny: { width: 34, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500 },
-  cyborg: { width: 91, height: 108, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500 },
-  mama_cyborg: { width: 91, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000 },
-  sigmatom: { width: 62, height: 75, speed: 215, damage: 4.5, bulletRadius: 15, bulletSpeed: 338, parryCooldown: 2250 },
+  granny: { width: 34, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
+  cyborg: { width: 91, height: 108, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
+  mama_cyborg: { width: 91, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
+  sigmatom: { width: 186, height: 225, speed: 215, damage: 4.5, bulletRadius: 20, bulletSpeed: 1014, parryCooldown: 2250, maxHealth: 200 },
 };
+function getMaxHealth(character) {
+  return CHARACTER_STATS[character]?.maxHealth || MAX_HEALTH;
+}
 const OBJECT_CONFIG = {
   car1: { width: 52, height: 52, radius: 25, maxHp: 3, xp: 20, contactDamage: 0.8 },
   car2: { width: 66, height: 40, radius: 28, maxHp: 5, xp: 35, contactDamage: 1.2 },
@@ -344,7 +347,7 @@ io.on("connection", (socket) => {
     dashReadyAt: 0,
     dashDirection: { x: 1, y: 0 },
     lastShotAt: 0,
-    health: MAX_HEALTH,
+    health: getMaxHealth("granny"),
     score,
     minigun: false,
     active: false,
@@ -353,6 +356,10 @@ io.on("connection", (socket) => {
     xp: 0,
     level: 1,
     lastObjectHitAt: 0,
+    lastDamageAt: 0,
+    soundwaveActive: false,
+    soundwaveAngle: 0,
+    lastSoundwavePulseAt: 0,
   };
   players.set(socket.id, p);
   if (!rooms.has(room)) rooms.set(room, new Set());
@@ -383,6 +390,7 @@ io.on("connection", (socket) => {
       if (character === "mama_cyborg" && p.level < 10 && p.xp < 1000) return;
       if (character === "granny" || character === "cyborg" || character === "mama_cyborg") {
         p.character = character;
+        p.health = getMaxHealth(character);
         const radius = characterRadius(character);
         p.x = clamp(p.x, radius, WIDTH - radius);
         p.y = clamp(p.y, radius, HEIGHT - radius);
@@ -394,6 +402,8 @@ io.on("connection", (socket) => {
     if (!validCharacters.includes(character)) return;
     if (character === "mama_cyborg" && (p.level < 10 && p.xp < 1000)) return;
     p.character = character;
+    p.health = getMaxHealth(character);
+    p.soundwaveActive = false;
     const radius = characterRadius(character);
     p.x = clamp(p.x, radius, WIDTH - radius);
     p.y = clamp(p.y, radius, HEIGHT - radius);
@@ -414,13 +424,39 @@ io.on("connection", (socket) => {
       timestamp: now,
     });
   });
+  socket.on("soundwave_start", (payload) => {
+    if (!p.active || p.health <= 0 || p.character !== "sigmatom") return;
+    p.soundwaveActive = true;
+    p.soundwaveAngle = Number(payload?.angle) || Math.atan2(p.facing.y, p.facing.x);
+    p.lastSoundwavePulseAt = Date.now();
+    io.to(room).emit("soundwave_started", {
+      playerId: p.id,
+      angle: p.soundwaveAngle,
+    });
+  });
+  socket.on("soundwave_aim", (payload) => {
+    if (!p.active || p.health <= 0 || p.character !== "sigmatom" || !p.soundwaveActive) return;
+    p.soundwaveAngle = Number(payload?.angle) || 0;
+    io.to(room).emit("soundwave_aimed", {
+      playerId: p.id,
+      angle: p.soundwaveAngle,
+    });
+  });
+  socket.on("soundwave_stop", () => {
+    if (!p.soundwaveActive) return;
+    p.soundwaveActive = false;
+    io.to(room).emit("soundwave_stopped", {
+      playerId: p.id,
+    });
+  });
   socket.on("active", (active) => {
     const nextActive = active === true;
     if (nextActive && !p.active) {
       const nextSpawn = randomPosition(p.character);
       p.x = nextSpawn.x;
       p.y = nextSpawn.y;
-      p.health = MAX_HEALTH;
+      p.health = getMaxHealth(p.character);
+      p.soundwaveActive = false;
       p.protectedUntil = Date.now() + SPAWN_PROTECTION;
       p.lastShotAt = 0;
       p.dashStartedAt = 0;
@@ -476,16 +512,28 @@ io.on("connection", (socket) => {
     )
       return;
 
-    // Sigma Tom's Dash is replaced by the Sigma Shot: 16 balls in a circular spiral!
-    if (p.character === "sigmatom" || payload?.sigmaShot) {
+    // Sigma Tom & Mama Cyborg Dash is replaced by the Shield Ability + 16-bullet Spiral Barrier!
+    if (p.character === "sigmatom" || p.character === "mama_cyborg" || payload?.sigmaShot) {
       p.dashReadyAt = now + DASH_COOLDOWN;
+      // Activate deflect parry shield so incoming shots are deflected!
+      p.parryId += 1;
+      p.parryStartedAt = now;
+      p.parryUntil = now + PARRY_DURATION;
+      const stats = CHARACTER_STATS[p.character] || CHARACTER_STATS.granny;
+      p.parryReadyAt = now + (stats.parryCooldown || PARRY_COOLDOWN);
+
+      const isMama = p.character === "mama_cyborg";
       const NUM_SPIRAL = 16;
+      const bulletChar = isMama ? "mama_cyborg_spiral" : "sigmatom_spiral";
+      const bRad = isMama ? 9 : 10;
+      const bDmg = isMama ? 2.2 : 2.0;
+      const spawnDist = characterRadius(p.character) + 20;
+
       for (let i = 0; i < NUM_SPIRAL; i++) {
         const angle = (i / NUM_SPIRAL) * Math.PI * 2;
-        const spiralSpeed = 260 + (i / NUM_SPIRAL) * 140;
+        const spiralSpeed = 280 + (i / NUM_SPIRAL) * 140;
         const vx = Math.cos(angle) * spiralSpeed;
         const vy = Math.sin(angle) * spiralSpeed;
-        const spawnDist = characterRadius("sigmatom") + 16;
         bullets.push({
           id: nextBulletId++,
           ownerId: p.id,
@@ -494,17 +542,25 @@ io.on("connection", (socket) => {
           y: p.y + Math.sin(angle) * spawnDist,
           vx,
           vy,
-          radius: 8,
-          damage: 1.5,
-          character: "sigmatom_spiral",
+          radius: bRad,
+          damage: bDmg,
+          character: bulletChar,
           expiresAt: now + 2400,
         });
       }
+      io.to(room).emit("parry_started", {
+        playerId: p.id,
+        parryId: p.parryId,
+        parryStartedAt: p.parryStartedAt,
+        parryUntil: p.parryUntil,
+        parryReadyAt: p.parryReadyAt,
+      });
       io.to(room).emit("sigma_shot", {
         playerId: p.id,
         x: p.x,
         y: p.y,
         dashReadyAt: p.dashReadyAt,
+        character: p.character,
       });
       return;
     }
@@ -582,9 +638,10 @@ io.on("connection", (socket) => {
       radius: bRadius,
       damage: stats.damage,
       character: p.character,
+      homing: p.character === "sigmatom",
       canSplit: isMama,
       splitAt: isMama ? now + 1000 : 0,
-      expiresAt: now + (p.character === "sigmatom" ? 2400 : (isMama ? 1200 : BULLET_LIFETIME)),
+      expiresAt: now + (p.character === "sigmatom" ? 2800 : (isMama ? 1200 : BULLET_LIFETIME)),
     });
   });
   socket.on("disconnect", () => {
@@ -680,6 +737,18 @@ setInterval(() => {
 
   const wallNow = Date.now();
 
+  // Health Regeneration: All players regenerate health over time!
+  for (const p of players.values()) {
+    if (!p.active || p.health <= 0) continue;
+    const maxHp = getMaxHealth(p.character);
+    if (p.health < maxHp) {
+      const timeSinceDamage = wallNow - (p.lastDamageAt || 0);
+      // Continuous regen: 2.5% max HP / sec. Out-of-combat boost after 3.5s without damage: 8% max HP / sec
+      const regenRate = timeSinceDamage > 3500 ? (maxHp * 0.08) : (maxHp * 0.025);
+      p.health = Math.min(maxHp, p.health + regenRate * dt);
+    }
+  }
+
   // Player collisions with Map Objects (diep.io style collision)
   for (const p of players.values()) {
     if (!p.active || p.health <= 0) continue;
@@ -709,11 +778,13 @@ setInterval(() => {
         } else if (isDashing) {
           obj.hp -= 4.0;
           p.health = Math.max(0, p.health - 0.2);
+          p.lastDamageAt = wallNow;
           obj.vx -= nx * 280;
           obj.vy -= ny * 280;
         } else {
           if (p.protectedUntil <= wallNow && (!p.lastObjectHitAt || wallNow - p.lastObjectHitAt > 450)) {
             p.lastObjectHitAt = wallNow;
+            p.lastDamageAt = wallNow;
             p.health = Math.max(0, p.health - obj.contactDamage);
             io.to(p.id).emit("jumpscare", { health: p.health, damage: obj.contactDamage });
           }
@@ -739,10 +810,157 @@ setInterval(() => {
     }
   }
 
+  // Sigma Tom Soundwave & Earthquake Physics
+  for (const p of players.values()) {
+    if (!p.active || p.health <= 0 || p.character !== "sigmatom" || !p.soundwaveActive) continue;
+    if (wallNow - (p.lastSoundwavePulseAt || 0) < 75) continue;
+    p.lastSoundwavePulseAt = wallNow;
+
+    const coneAngle = p.soundwaveAngle || 0;
+    const coneRange = 850;
+    const coneSpread = 0.58; // ~33 deg half-angle (66 deg total cone)
+    const roomPlayers = rooms.get(p.room);
+
+    if (roomPlayers) {
+      for (const targetId of roomPlayers) {
+        if (targetId === p.id) continue;
+        const target = players.get(targetId);
+        if (!target || !target.active || target.health <= 0 || target.protectedUntil > wallNow) continue;
+        const dx = target.x - p.x;
+        const dy = target.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > coneRange || dist < 1) continue;
+        const angleToTarget = Math.atan2(dy, dx);
+        let angleDiff = angleToTarget - coneAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        if (Math.abs(angleDiff) <= coneSpread) {
+          const damage = 0.55;
+          target.health = Math.max(0, target.health - damage);
+          target.lastDamageAt = wallNow;
+
+          // Seismic earthquake knockback
+          const knockback = (1 - dist / coneRange) * 26 + 10;
+          target.x = clamp(target.x + Math.cos(angleToTarget) * knockback, characterRadius(target.character), WIDTH - characterRadius(target.character));
+          target.y = clamp(target.y + Math.sin(angleToTarget) * knockback, characterRadius(target.character), HEIGHT - characterRadius(target.character));
+
+          io.to(target.id).emit("jumpscare", {
+            health: target.health,
+            damage,
+            attackerCharacter: "sigmatom_soundwave",
+          });
+
+          if (target.health === 0) {
+            target.score.deaths += 1;
+            p.score.kills += 1;
+            awardXp(p, 50);
+            target.xp = Math.floor((target.xp || 0) * 0.5);
+            target.level = getLevelForXp(target.xp);
+            io.to(target.id).emit("xp_update", {
+              xp: target.xp,
+              level: target.level,
+              lost: true,
+              nextLevelXp: getXpForNextLevel(target.level),
+            });
+            setTimeout(() => {
+              if (!players.has(target.id)) return;
+              const nextSpawn = randomPosition(target.character);
+              target.x = nextSpawn.x;
+              target.y = nextSpawn.y;
+              target.health = getMaxHealth(target.character);
+              target.protectedUntil = Date.now() + SPAWN_PROTECTION;
+              target.lastShotAt = 0;
+              target.dashUntil = 0;
+              target.dashReadyAt = 0;
+              target.parryUntil = 0;
+              target.parryReadyAt = 0;
+            }, 1200);
+          }
+        }
+      }
+    }
+
+    // Map objects in soundwave cone
+    const objs = roomObjects.get(p.room);
+    if (objs) {
+      for (let oi = objs.length - 1; oi >= 0; oi--) {
+        const obj = objs[oi];
+        const dx = obj.x - p.x;
+        const dy = obj.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > coneRange || dist < 1) continue;
+        const angleToObj = Math.atan2(dy, dx);
+        let angleDiff = angleToObj - coneAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        if (Math.abs(angleDiff) <= coneSpread) {
+          obj.hp -= 0.75;
+          const force = (1 - dist / coneRange) * 140 + 40;
+          obj.vx += Math.cos(angleToObj) * force;
+          obj.vy += Math.sin(angleToObj) * force;
+          if (obj.hp <= 0) {
+            objs.splice(oi, 1);
+            awardXp(p, obj.xp);
+            io.to(p.room).emit("object_destroyed", {
+              id: obj.id,
+              type: obj.type,
+              x: obj.x,
+              y: obj.y,
+              killerId: p.id,
+              xp: obj.xp,
+            });
+            setTimeout(() => respawnObject(p.room, obj.type), 3500);
+          }
+        }
+      }
+    }
+  }
+
   for (let i = bullets.length - 1; i >= 0; i--) {
     const bullet = bullets[i];
     const previousX = bullet.x;
     const previousY = bullet.y;
+
+    // Sigma Tom Bullet Homing (Auto-Aim): Bullets track the nearest enemy player
+    if (bullet.character === "sigmatom" || bullet.homing) {
+      const roomPlayers = rooms.get(bullet.room);
+      if (roomPlayers) {
+        let nearestTarget = null;
+        let nearestDist = 2400;
+        for (const targetId of roomPlayers) {
+          if (targetId === bullet.ownerId) continue;
+          const target = players.get(targetId);
+          if (
+            !target ||
+            !target.active ||
+            target.health <= 0 ||
+            target.protectedUntil > wallNow
+          )
+            continue;
+          const d = Math.hypot(target.x - bullet.x, target.y - bullet.y);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestTarget = target;
+          }
+        }
+        if (nearestTarget) {
+          const tdx = nearestTarget.x - bullet.x;
+          const tdy = nearestTarget.y - bullet.y;
+          const targetAngle = Math.atan2(tdy, tdx);
+          const currentSpeed = Math.hypot(bullet.vx, bullet.vy) || 1014;
+          let currentAngle = Math.atan2(bullet.vy, bullet.vx);
+          let angleDiff = targetAngle - currentAngle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          const maxTurn = 7.5 * dt;
+          const turn = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
+          currentAngle += turn;
+          bullet.vx = Math.cos(currentAngle) * currentSpeed;
+          bullet.vy = Math.sin(currentAngle) * currentSpeed;
+        }
+      }
+    }
+
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
     const bRadius = bullet.radius || BULLET_RADIUS;
@@ -915,6 +1133,7 @@ setInterval(() => {
       });
     if (hit) {
       hit.health = Math.max(0, hit.health - bullet.damage);
+      hit.lastDamageAt = wallNow;
       io.to(hit.id).emit("jumpscare", {
         health: hit.health,
         damage: bullet.damage,
@@ -955,7 +1174,8 @@ setInterval(() => {
           const nextSpawn = randomPosition(hit.character);
           hit.x = nextSpawn.x;
           hit.y = nextSpawn.y;
-          hit.health = MAX_HEALTH;
+          hit.health = getMaxHealth(hit.character);
+          hit.soundwaveActive = false;
           hit.protectedUntil = Date.now() + SPAWN_PROTECTION;
           hit.lastShotAt = 0;
           hit.dashUntil = 0;
@@ -993,11 +1213,14 @@ setInterval(() => {
         dashReadyAt: p.dashReadyAt,
         dashDirection: p.dashDirection,
         lastInputSeq: p.lastInputSeq,
-        health: p.health,
+        health: Math.round(p.health * 10) / 10,
+        maxHealth: getMaxHealth(p.character),
         kills: p.score.kills,
         deaths: p.score.deaths,
         minigun: p.minigun,
         protectedUntil: p.protectedUntil,
+        soundwaveActive: p.soundwaveActive === true,
+        soundwaveAngle: p.soundwaveAngle || 0,
         xp: p.xp,
         level: p.level,
       }));
@@ -1038,7 +1261,7 @@ setInterval(() => {
           vx,
           vy,
           character,
-          radius: radius || (character === "sigmatom" ? 15 : (character === "sigmatom_spiral" ? 8 : (character === "mama_cyborg" || character === "mama_cyborg_split" ? 8 : (character === "cyborg" ? 6.5 : 5)))),
+          radius: radius || (character === "sigmatom" ? 20 : (character === "sigmatom_spiral" ? 10 : (character === "mama_cyborg" || character === "mama_cyborg_split" || character === "mama_cyborg_spiral" ? 9 : (character === "cyborg" ? 6.5 : 5)))),
         })),
     });
   }
