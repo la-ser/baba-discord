@@ -1095,6 +1095,7 @@ function createRandomObject(room, type = Math.random() < 0.5 ? "car1" : "car2") 
 }
 
 function initRoomObjects(room) {
+  if (room.endsWith(":horde")) return;
   if (roomObjects.has(room)) return;
   const list = [];
   for (let i = 0; i < OBJECT_COUNT; i++) {
@@ -1104,6 +1105,7 @@ function initRoomObjects(room) {
 }
 
 function respawnObject(room, type) {
+  if (room.endsWith(":horde")) return;
   const list = roomObjects.get(room);
   if (!list) return;
   list.push(createRandomObject(room, type));
@@ -1501,9 +1503,10 @@ io.on("connection", (socket) => {
   const currentMode = initialMode === "horde" ? "horde" : "ffa";
   const room = `activity:${instanceId}:${currentMode}`;
   socket.join(room);
-  initRoomObjects(room);
   if (currentMode === "horde") {
     initHordeGame(room);
+  } else {
+    initRoomObjects(room);
   }
   if (!roomScores.has(room)) roomScores.set(room, new Map());
   const scores = roomScores.get(room);
@@ -1603,12 +1606,17 @@ io.on("connection", (socket) => {
     }
   });
   socket.on("switch_character", (character) => {
-    if (p.mode === "horde") return;
-    const validCharacters = ["granny", "cyborg", "mama_cyborg", "angry_granny", "sigmatom"];
-    if (!validCharacters.includes(character)) return;
-    if ((character === "mama_cyborg" || character === "angry_granny") && (p.level < 10 && p.xp < 1000)) return;
+    if (p.mode === "horde") {
+      if (character !== "sigmatom" && character !== "scientist") return;
+    } else {
+      const validCharacters = ["granny", "cyborg", "mama_cyborg", "angry_granny", "sigmatom"];
+      if (!validCharacters.includes(character)) return;
+      if ((character === "mama_cyborg" || character === "angry_granny") && (p.level < 10 && p.xp < 1000)) return;
+    }
     p.character = character;
-    p.lastFfaCharacter = character;
+    if (p.mode !== "horde") {
+      p.lastFfaCharacter = character;
+    }
     const maxHp = getMaxHealth(character);
     p.health = maxHp;
     p.soundwaveActive = false;
@@ -1646,7 +1654,6 @@ io.on("connection", (socket) => {
       p.x = spawn.x;
       p.y = spawn.y;
       initHordeGame(newRoom);
-      initRoomObjects(newRoom);
     } else {
       p.character = p.lastFfaCharacter || "granny";
       p.health = getMaxHealth(p.character);
@@ -1739,6 +1746,23 @@ io.on("connection", (socket) => {
       y: p.y,
       timestamp: now,
     });
+    const horde = hordeGames.get(p.room);
+    if (horde) {
+      for (const enemy of horde.enemies) {
+        const dx = enemy.x - p.x;
+        const dy = enemy.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 340) {
+          const pushX = dx / (d || 1);
+          const pushY = dy / (d || 1);
+          enemy.x += pushX * 140;
+          enemy.y += pushY * 140;
+          const clamped = clampToArena(enemy.x, enemy.y, enemy.radius);
+          enemy.x = clamped.x;
+          enemy.y = clamped.y;
+        }
+      }
+    }
   });
   socket.on("soundwave_start", (payload) => {
     if (!p.active || p.health <= 0 || p.character !== "sigmatom") return;
@@ -1847,7 +1871,7 @@ io.on("connection", (socket) => {
     if (
       !p.active ||
       p.health <= 0 ||
-      (p.mode === "horde" && !p.hasDash) ||
+      (p.mode === "horde" && !p.hasDash && p.character !== "sigmatom") ||
       now < p.dashReadyAt ||
       now < p.parryUntil
     )
@@ -2257,6 +2281,60 @@ setInterval(() => {
       }
     }
 
+    // Horde enemies in soundwave cone
+    const horde = hordeGames.get(p.room);
+    if (horde) {
+      for (let ei = horde.enemies.length - 1; ei >= 0; ei--) {
+        const enemy = horde.enemies[ei];
+        const dx = enemy.x - p.x;
+        const dy = enemy.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > coneRange || dist < 1) continue;
+        const angleToEnemy = Math.atan2(dy, dx);
+        let angleDiff = angleToEnemy - coneAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        if (Math.abs(angleDiff) <= coneSpread) {
+          const damage = 0.55;
+          enemy.hp -= damage;
+          const force = (1 - dist / coneRange) * 32 + 14;
+          enemy.x += Math.cos(angleToEnemy) * force;
+          enemy.y += Math.sin(angleToEnemy) * force;
+          const clamped = clampToArena(enemy.x, enemy.y, enemy.radius);
+          enemy.x = clamped.x;
+          enemy.y = clamped.y;
+
+          const isKill = enemy.hp <= 0;
+          io.to(p.id).emit("hit_marker", {
+            targetId: "enemy_" + enemy.id,
+            damage,
+            kill: isKill,
+          });
+          io.to(p.room).emit("enemy_hit", {
+            enemyId: enemy.id,
+            damage,
+            hp: Math.max(0, enemy.hp),
+            maxHp: enemy.maxHp,
+            x: enemy.x,
+            y: enemy.y,
+          });
+          if (isKill) {
+            p.score.kills += 1;
+            awardXp(p, enemy.xp);
+            io.to(p.room).emit("enemy_killed", {
+              enemyId: enemy.id,
+              type: enemy.type,
+              x: enemy.x,
+              y: enemy.y,
+              killerId: p.id,
+              xp: enemy.xp,
+            });
+            horde.enemies.splice(ei, 1);
+          }
+        }
+      }
+    }
+
     // Map objects in soundwave cone
     const objs = roomObjects.get(p.room);
     if (objs) {
@@ -2298,43 +2376,57 @@ setInterval(() => {
     const previousX = bullet.x;
     const previousY = bullet.y;
 
-    // Sigma Tom Bullet Homing (Auto-Aim): Bullets track the nearest enemy player
+    // Sigma Tom Bullet Homing (Auto-Aim): Bullets track the nearest enemy player or horde enemy
     if (bullet.character === "sigmatom" || bullet.homing) {
-      const roomPlayers = rooms.get(bullet.room);
-      if (roomPlayers) {
-        let nearestTarget = null;
-        let nearestDist = 2400;
-        for (const targetId of roomPlayers) {
-          if (targetId === bullet.ownerId) continue;
-          const target = players.get(targetId);
-          if (
-            !target ||
-            !target.active ||
-            target.health <= 0 ||
-            target.protectedUntil > wallNow
-          )
-            continue;
-          const d = Math.hypot(target.x - bullet.x, target.y - bullet.y);
+      let nearestTarget = null;
+      let nearestDist = 2400;
+      const isHorde = bullet.room.endsWith(":horde");
+      const horde = isHorde ? hordeGames.get(bullet.room) : null;
+
+      if (horde && horde.enemies.length > 0) {
+        for (const enemy of horde.enemies) {
+          const d = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
           if (d < nearestDist) {
             nearestDist = d;
-            nearestTarget = target;
+            nearestTarget = enemy;
           }
         }
-        if (nearestTarget) {
-          const tdx = nearestTarget.x - bullet.x;
-          const tdy = nearestTarget.y - bullet.y;
-          const targetAngle = Math.atan2(tdy, tdx);
-          const currentSpeed = Math.hypot(bullet.vx, bullet.vy) || 1014;
-          let currentAngle = Math.atan2(bullet.vy, bullet.vx);
-          let angleDiff = targetAngle - currentAngle;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          const maxTurn = 7.5 * dt;
-          const turn = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
-          currentAngle += turn;
-          bullet.vx = Math.cos(currentAngle) * currentSpeed;
-          bullet.vy = Math.sin(currentAngle) * currentSpeed;
+      } else {
+        const roomPlayers = rooms.get(bullet.room);
+        if (roomPlayers) {
+          for (const targetId of roomPlayers) {
+            if (targetId === bullet.ownerId) continue;
+            const target = players.get(targetId);
+            if (
+              !target ||
+              !target.active ||
+              target.health <= 0 ||
+              target.protectedUntil > wallNow
+            )
+              continue;
+            const d = Math.hypot(target.x - bullet.x, target.y - bullet.y);
+            if (d < nearestDist) {
+              nearestDist = d;
+              nearestTarget = target;
+            }
+          }
         }
+      }
+
+      if (nearestTarget) {
+        const tdx = nearestTarget.x - bullet.x;
+        const tdy = nearestTarget.y - bullet.y;
+        const targetAngle = Math.atan2(tdy, tdx);
+        const currentSpeed = Math.hypot(bullet.vx, bullet.vy) || 1014;
+        let currentAngle = Math.atan2(bullet.vy, bullet.vx);
+        let angleDiff = targetAngle - currentAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        const maxTurn = 7.5 * dt;
+        const turn = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
+        currentAngle += turn;
+        bullet.vx = Math.cos(currentAngle) * currentSpeed;
+        bullet.vy = Math.sin(currentAngle) * currentSpeed;
       }
     }
 
@@ -2821,7 +2913,7 @@ setInterval(() => {
         dodging: wallNow < e.dodgeUntil,
         frozen: Boolean(e.frozenUntil && wallNow < e.frozenUntil),
       })) : [],
-      objects: (roomObjects.get(room) || []).map((o) => ({
+      objects: isHordeRoom ? [] : (roomObjects.get(room) || []).map((o) => ({
         id: o.id,
         type: o.type,
         x: Math.round(o.x * 10) / 10,
