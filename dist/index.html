@@ -951,20 +951,353 @@
         pointer-events: none;
       }
 
-      @media (max-width: 720px) {
+      /* Mobile Touch Controls Overlay */
+      .mobile-controls {
+        position: absolute;
+        inset: 0;
+        z-index: 15;
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+      }
+      .mobile-controls.hidden {
+        display: none !important;
+      }
+
+      /* Virtual Movement Joystick */
+      .joystick-zone {
+        position: absolute;
+        bottom: 18px;
+        left: 18px;
+        width: 130px;
+        height: 130px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .joystick-base {
+        position: relative;
+        width: 108px;
+        height: 108px;
+        border-radius: 50%;
+        background: rgba(6, 12, 24, 0.68);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 2px solid rgba(0, 229, 255, 0.32);
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.12), inset 0 0 16px rgba(0, 0, 0, 0.65);
+        display: grid;
+        place-items: center;
+        touch-action: none;
+      }
+      .joystick-crosshair-h {
+        position: absolute;
+        width: 76%;
+        height: 1px;
+        background: rgba(0, 229, 255, 0.18);
+        pointer-events: none;
+      }
+      .joystick-crosshair-v {
+        position: absolute;
+        height: 76%;
+        width: 1px;
+        background: rgba(0, 229, 255, 0.18);
+        pointer-events: none;
+      }
+      .joystick-knob {
+        position: absolute;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, #38bdf8, #0284c7 70%, #0369a1);
+        border: 2px solid rgba(255, 255, 255, 0.88);
+        box-shadow: 0 4px 14px rgba(0, 229, 255, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.55);
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        transform: translate(0px, 0px);
+        will-change: transform;
+        transition: transform 0.08s ease-out;
+      }
+      .joystick-knob.active {
+        transition: none;
+        box-shadow: 0 0 22px rgba(0, 229, 255, 0.85), inset 0 2px 4px rgba(255, 255, 255, 0.75);
+      }
+      .knob-core {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 0 8px #ffffff;
+      }
+      .joystick-hint {
+        margin-top: 5px;
+        font-family: var(--font-mono);
+        font-size: 8px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        color: var(--accent-cyan);
+        opacity: 0.7;
+        pointer-events: none;
+      }
+
+      /* Mobile Action Buttons Cluster */
+      .mobile-actions {
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        width: 180px;
+        height: 160px;
+        pointer-events: none;
+      }
+      .mobile-btn {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: 1.5px solid rgba(255, 255, 255, 0.2);
+        background: rgba(8, 14, 26, 0.78);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #ffffff;
+        cursor: pointer;
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        outline: none;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        transition: transform 0.08s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+        overflow: hidden;
+      }
+      .mobile-btn:active {
+        transform: scale(0.92);
+      }
+
+      /* Shoot / Fire Button */
+      .btn-shoot {
+        width: 62px;
+        height: 62px;
+        bottom: 0px;
+        right: 0px;
+        background: radial-gradient(circle at 35% 35%, #ff4d64, #dc2626 75%, #991b1b);
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.45);
+      }
+      .btn-shoot:active, .btn-shoot.pressed {
+        background: radial-gradient(circle at 35% 35%, #ff6b7e, #b91c1c 80%, #7f1d1d);
+        box-shadow: 0 0 26px rgba(255, 51, 75, 0.9);
+        transform: scale(0.93);
+      }
+      .btn-shoot-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        pointer-events: none;
+      }
+      .btn-shoot .btn-title {
+        font-family: var(--font-mono);
+        font-size: 8.5px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+      }
+
+      /* Dodge / Dash Button */
+      .btn-dash {
+        width: 48px;
+        height: 48px;
+        bottom: 72px;
+        right: 8px;
+        border-color: rgba(0, 229, 255, 0.45);
+        color: var(--accent-cyan);
+      }
+      .btn-dash:active {
+        background: rgba(0, 229, 255, 0.22);
+        box-shadow: 0 0 18px rgba(0, 229, 255, 0.55);
+      }
+      .btn-dash .btn-title {
+        font-family: var(--font-mono);
+        font-size: 7.5px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #ffffff;
+      }
+
+      /* Deflect / Parry Button */
+      .btn-parry {
+        width: 48px;
+        height: 48px;
+        bottom: 8px;
+        right: 74px;
+        border-color: rgba(255, 190, 26, 0.45);
+        color: var(--accent-gold);
+      }
+      .btn-parry:active {
+        background: rgba(255, 190, 26, 0.22);
+        box-shadow: 0 0 18px rgba(255, 190, 26, 0.55);
+      }
+      .btn-parry .btn-title {
+        font-family: var(--font-mono);
+        font-size: 7px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #ffffff;
+      }
+
+      /* Auto-Fire Toggle Button ("Keep shooting") */
+      .btn-autofire {
+        width: 66px;
+        height: 38px;
+        bottom: 80px;
+        right: 68px;
+        border-radius: 19px;
+        flex-direction: column;
+        gap: 0px;
+        border-color: rgba(255, 255, 255, 0.22);
+        background: rgba(12, 18, 30, 0.88);
+      }
+      .btn-autofire.active {
+        border-color: var(--accent-red);
+        background: rgba(255, 51, 75, 0.25);
+        box-shadow: 0 0 18px rgba(255, 51, 75, 0.65), inset 0 1px 0 rgba(255, 120, 140, 0.4);
+      }
+      .btn-autofire .btn-title {
+        font-family: var(--font-mono);
+        font-size: 7px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        color: var(--text-secondary);
+        transition: color 0.15s;
+      }
+      .btn-autofire.active .btn-title {
+        color: #ffffff;
+      }
+      .btn-autofire .btn-status {
+        font-family: var(--font-mono);
+        font-size: 8.5px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        transition: color 0.15s;
+      }
+      .btn-autofire.active .btn-status {
+        color: var(--accent-red);
+        text-shadow: 0 0 8px rgba(255, 51, 75, 0.85);
+      }
+
+      /* Cooldown Overlays */
+      .btn-fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 0%;
+        background: rgba(0, 0, 0, 0.65);
+        pointer-events: none;
+        transition: width 0.06s linear;
+      }
+      .btn-cd {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 900;
+        color: #ffffff;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+        background: rgba(4, 7, 14, 0.72);
+        pointer-events: none;
+        border-radius: inherit;
+      }
+
+      /* Settings Select Dropdown */
+      .settings-select {
+        width: 100%;
+        height: 38px;
+        padding: 0 12px;
+        background: rgba(10, 14, 24, 0.7);
+        border: 1px solid var(--border-med);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+        outline: none;
+      }
+      .settings-select:focus {
+        border-color: var(--accent-red);
+      }
+
+      /* Desktop Auto-Fire Indicator Dock */
+      #autofire-dock.active {
+        border-color: var(--accent-red);
+        background: rgba(255, 51, 75, 0.18);
+        box-shadow: 0 0 12px rgba(255, 51, 75, 0.4);
+      }
+      #autofire-dock.active #autofire-dock-label {
+        color: var(--accent-red);
+      }
+
+      @media (max-width: 768px), (pointer: coarse) {
+        #game-shell {
+          padding: 0;
+        }
+        #game-viewport {
+          border-radius: 0;
+          border: none;
+          box-shadow: none;
+        }
         .menu-container {
           grid-template-columns: 1fr;
-          padding: 24px;
+          padding: 22px;
+          max-height: 90vh;
+          overflow-y: auto;
         }
         .menu-preview { display: none; }
+        .roster-container {
+          max-height: 90vh;
+          overflow-y: auto;
+          padding: 22px;
+        }
         .roster-grid { grid-template-columns: 1fr; }
         #minimap-panel { display: none; }
-        #round-stats { top: 12px; padding: 6px 12px; }
-        #hud { bottom: 12px; left: 12px; }
-        #match-info { bottom: 12px; }
+        #hud {
+          bottom: auto;
+          top: 10px;
+          left: 10px;
+          transform: scale(0.85);
+          transform-origin: top left;
+        }
+        #round-stats {
+          top: 10px;
+          padding: 4px 10px;
+          transform: translateX(-50%) scale(0.85);
+        }
+        #match-info {
+          display: none !important;
+        }
+        #pause-button {
+          bottom: auto;
+          top: 10px;
+          right: 10px;
+        }
+        #leaderboard {
+          top: 48px;
+          right: 10px;
+          transform: scale(0.82);
+          transform-origin: top right;
+          max-height: 120px;
+          overflow-y: auto;
+        }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-Dq_t29MV.js"></script>
+    <script type="module" crossorigin src="/assets/index-BloefpnG.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -1039,6 +1372,10 @@
             <span class="key-badge">E</span>
             <span id="controls-hint">FIRE</span>
           </div>
+          <div id="autofire-dock" class="ability-weapon" style="cursor: pointer;" title="Toggle Auto-Fire [Q]">
+            <span class="key-badge">Q</span>
+            <span id="autofire-dock-label">AUTO: OFF</span>
+          </div>
         </div>
 
         <!-- Settings Trigger -->
@@ -1046,6 +1383,61 @@
           <span class="pause-icon">⚙</span>
           <span class="pause-hint">ESC</span>
         </button>
+
+        <!-- MOBILE TOUCH CONTROLS OVERLAY -->
+        <div id="mobile-controls" class="mobile-controls hidden">
+          <!-- Left: Virtual Movement Joystick Zone -->
+          <div id="joystick-zone" class="joystick-zone">
+            <div id="joystick-base" class="joystick-base">
+              <div class="joystick-crosshair-h"></div>
+              <div class="joystick-crosshair-v"></div>
+              <div id="joystick-knob" class="joystick-knob">
+                <div class="knob-core"></div>
+              </div>
+            </div>
+            <span class="joystick-hint">MOVE</span>
+          </div>
+
+          <!-- Right: Mobile Combat Action Cluster -->
+          <div id="mobile-actions" class="mobile-actions">
+            <!-- Auto-Fire Toggle Button ("Keep Shooting") -->
+            <button id="btn-autofire" class="mobile-btn btn-autofire" aria-label="Toggle Auto-Fire" type="button">
+              <span class="btn-title">AUTO FIRE</span>
+              <span id="autofire-status" class="btn-status">OFF</span>
+            </button>
+
+            <!-- Deflect / Parry Button -->
+            <button id="btn-parry" class="mobile-btn btn-parry" aria-label="Deflect" type="button">
+              <svg class="btn-svg" viewBox="0 0 24 24" width="20" height="20">
+                <path fill="currentColor" d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.09-2.73 7.9-6 8.91-3.27-1.01-6-4.82-6-8.91V6.43l6-2.25z"/>
+              </svg>
+              <span class="btn-title">PARRY</span>
+              <span id="mobile-parry-cd" class="btn-cd hidden"></span>
+              <div id="mobile-parry-fill" class="btn-fill"></div>
+            </button>
+
+            <!-- Dodge / Dash Button -->
+            <button id="btn-dash" class="mobile-btn btn-dash" aria-label="Dodge / Dash" type="button">
+              <svg class="btn-svg" viewBox="0 0 24 24" width="20" height="20">
+                <path fill="currentColor" d="M13 2.05v3.03c3.39.49 6 3.39 6 6.92 0 .9-.18 1.75-.48 2.54l2.6 1.53c.56-1.24.88-2.62.88-4.07 0-5.18-3.95-9.45-9-9.95zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V2.05c-5.05.5-9 4.76-9 9.95 0 5.52 4.47 10 9.99 10 3.31 0 6.24-1.61 8.01-4.09l-2.45-1.45C16.27 18.06 14.28 19 12 19zm1-11l-5 5h3v5l5-5h-3z"/>
+              </svg>
+              <span class="btn-title">DODGE</span>
+              <span id="mobile-dash-cd" class="btn-cd hidden"></span>
+              <div id="mobile-dash-fill" class="btn-fill"></div>
+            </button>
+
+            <!-- Main Shoot / Fire Button -->
+            <button id="btn-shoot" class="mobile-btn btn-shoot" aria-label="Shoot Weapon" type="button">
+              <div class="btn-shoot-inner">
+                <svg class="btn-svg" viewBox="0 0 24 24" width="22" height="22">
+                  <circle cx="12" cy="12" r="3.2" fill="currentColor"/>
+                  <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z"/>
+                </svg>
+                <span class="btn-title">FIRE</span>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1150,6 +1542,16 @@
               <output id="sound-output">15%</output>
             </div>
             <input id="sound-volume" type="range" min="0" max="100" value="15" />
+          </div>
+          <div class="slider-row">
+            <div class="slider-header">
+              <label for="touch-controls-select">Mobile Touch Controls</label>
+            </div>
+            <select id="touch-controls-select" class="settings-select">
+              <option value="auto">Auto-Detect</option>
+              <option value="on">Always Enabled</option>
+              <option value="off">Disabled</option>
+            </select>
           </div>
         </div>
         <div class="settings-actions">
