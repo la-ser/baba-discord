@@ -1296,8 +1296,314 @@
           overflow-y: auto;
         }
       }
+
+      /* XP & Leveling Bar in HUD */
+      .xp-container {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .xp-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: var(--font-mono);
+        font-size: 10px;
+      }
+      .xp-badge {
+        background: linear-gradient(135deg, #a855f7, #ec4899);
+        color: #ffffff;
+        font-weight: 900;
+        padding: 2px 6px;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+        box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+      }
+      .xp-numbers {
+        color: var(--text-secondary);
+        font-weight: 700;
+      }
+      .xp-bar {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      #xp-fill {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #a855f7, #f43f5e, #fbbf24);
+        box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+        transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      /* Roster Card 3-Column & Sigma Tom */
+      .roster-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+      }
+      .character-card.locked {
+        opacity: 0.65;
+        filter: grayscale(0.4);
+      }
+      .character-card.locked:hover {
+        opacity: 0.85;
+        filter: grayscale(0.2);
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .lock-indicator {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(255, 190, 26, 0.15);
+        border: 1px solid rgba(255, 190, 26, 0.3);
+        color: #ffbe1a;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+      }
+      .character-card[data-character="sigmatom"].selected {
+        border-color: #a855f7;
+        background: rgba(168, 85, 247, 0.08);
+        box-shadow: 0 0 0 1px #a855f7, 0 12px 30px rgba(168, 85, 247, 0.35);
+      }
+      .character-card[data-character="sigmatom"].selected::after {
+        color: #a855f7;
+      }
+      .character-card[data-character="sigmatom"] .portrait {
+        background: radial-gradient(circle, rgba(168, 85, 247, 0.15), transparent 70%);
+      }
+      .character-card[data-character="sigmatom"] img {
+        max-height: 120px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.4));
+      }
+
+      /* Custom Keybindings in Settings */
+      .settings-card {
+        width: min(460px, 94vw) !important;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .settings-divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.08);
+        margin: 8px 0;
+      }
+      .settings-section-head h3 {
+        margin: 2px 0 3px;
+        font-size: 15px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: #ffffff;
+      }
+      .settings-sub {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin: 0 0 10px;
+      }
+      .keybinds-list {
+        display: grid;
+        gap: 7px;
+      }
+      .keybind-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 6px;
+      }
+      .keybind-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .keybind-btn {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 800;
+        padding: 5px 12px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid var(--border-subtle);
+        color: var(--accent-cyan);
+        cursor: pointer;
+        min-width: 90px;
+        text-align: center;
+        transition: all 0.15s;
+      }
+      .keybind-btn:hover {
+        background: rgba(0, 229, 255, 0.15);
+        border-color: var(--accent-cyan);
+      }
+      .keybind-btn.binding {
+        background: rgba(255, 51, 75, 0.2);
+        border-color: var(--accent-red);
+        color: #ffffff;
+        animation: bindPulse 0.8s infinite alternate;
+      }
+      @keyframes bindPulse {
+        from { box-shadow: 0 0 4px rgba(255, 51, 75, 0.4); transform: scale(0.98); }
+        to { box-shadow: 0 0 14px rgba(255, 51, 75, 0.85); transform: scale(1.02); }
+      }
+
+      /* Sigma Tom Unlock Modal */
+      .sigma-unlock-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+      }
+      .sigma-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(38, 14, 60, 0.88), rgba(4, 5, 12, 0.96));
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+      }
+      .sigma-modal-card {
+        position: relative;
+        width: min(440px, 94vw);
+        padding: 28px 24px 22px;
+        border-radius: 16px;
+        border: 1.5px solid rgba(168, 85, 247, 0.5);
+        background: rgba(14, 11, 24, 0.94);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9), 0 0 60px rgba(168, 85, 247, 0.35);
+        text-align: center;
+        animation: sigmaEntrance 0.4s cubic-bezier(0.18, 1.25, 0.32, 1) forwards;
+        overflow: hidden;
+      }
+      @keyframes sigmaEntrance {
+        0% { opacity: 0; transform: scale(0.75) translateY(20px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .sigma-badge-pill {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.25));
+        border: 1px solid rgba(168, 85, 247, 0.5);
+        color: #f472b6;
+        margin-bottom: 12px;
+      }
+      .sigma-portrait-frame {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 14px;
+        display: grid;
+        place-items: center;
+      }
+      .sigma-portrait-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.8));
+        animation: sigmaFloat 3s ease-in-out infinite;
+        position: relative;
+        z-index: 2;
+      }
+      @keyframes sigmaFloat {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-6px) rotate(-1.5deg); }
+      }
+      .sigma-glow-ring {
+        position: absolute;
+        inset: -8px;
+        border-radius: 50%;
+        border: 2px dashed rgba(168, 85, 247, 0.6);
+        animation: ringSpin 12s linear infinite;
+        box-shadow: 0 0 30px rgba(168, 85, 247, 0.4);
+      }
+      @keyframes ringSpin {
+        to { transform: rotate(360deg); }
+      }
+      .sigma-title {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        margin: 0 0 4px;
+        color: #ffffff;
+        text-transform: uppercase;
+      }
+      .sigma-title span {
+        background: linear-gradient(90deg, #c084fc, #f472b6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .sigma-quote {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin: 0 0 16px;
+        font-style: italic;
+      }
+      .sigma-perks {
+        display: grid;
+        gap: 8px;
+        text-align: left;
+        margin-bottom: 20px;
+      }
+      .sigma-perk {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(168, 85, 247, 0.2);
+        border-radius: 8px;
+      }
+      .perk-icon {
+        font-size: 18px;
+        min-width: 24px;
+        text-align: center;
+      }
+      .perk-info strong {
+        display: block;
+        font-size: 12px;
+        color: #ffffff;
+      }
+      .perk-info p {
+        margin: 0;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .sigma-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .btn-glow {
+        background: linear-gradient(90deg, #9333ea, #db2777) !important;
+        border: none !important;
+        color: #ffffff !important;
+        font-weight: 850 !important;
+        letter-spacing: 0.05em !important;
+        box-shadow: 0 0 25px rgba(219, 39, 119, 0.5) !important;
+        transition: transform 0.15s, box-shadow 0.15s !important;
+      }
+      .btn-glow:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 35px rgba(219, 39, 119, 0.8) !important;
+      }
     </style>
-    <script type="module" crossorigin src="/assets/index-BloefpnG.js"></script>
+    <script type="module" crossorigin src="/assets/index-dKri_-e0.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -1321,6 +1627,15 @@
               <div class="health-readout"><span id="health-value">100</span><span class="health-unit">%</span></div>
             </div>
             <div id="protection" class="hidden">Spawn Shield Active</div>
+            <div class="xp-container">
+              <div class="xp-meta">
+                <span class="xp-badge" id="hud-level">LVL 1</span>
+                <span class="xp-numbers" id="hud-xp-readout">0 / 30 XP</span>
+              </div>
+              <div class="xp-bar">
+                <div id="xp-fill"></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1510,6 +1825,21 @@
               </div>
             </span>
           </button>
+          <button class="character-card locked" data-character="sigmatom" id="card-sigmatom">
+            <span class="portrait"><img id="sigmatom-portrait" alt="Sigma Tom" /></span>
+            <span class="character-copy">
+              <div class="card-head">
+                <h3>Sigma Tom</h3>
+                <span class="lock-indicator" id="sigmatom-lock-indicator">🔒 LVL 3 (75 XP)</span>
+              </div>
+              <p>The ultimate operative. 3x Mega Bullets (2x DMG), halved dodge cooldown, and 16-orb Sigma Spiral Shot.</p>
+              <div class="stats">
+                <div class="stat">Speed <span class="meter"><i style="--value:72%"></i></span></div>
+                <div class="stat">Damage <span class="meter"><i style="--value:98%"></i></span></div>
+                <div class="stat">Profile <span class="meter"><i style="--value:64%"></i></span></div>
+              </div>
+            </span>
+          </button>
         </div>
         <div class="roster-actions">
           <button id="character-back" class="btn">Back</button>
@@ -1553,6 +1883,50 @@
               <option value="off">Disabled</option>
             </select>
           </div>
+
+          <div class="settings-divider"></div>
+
+          <div class="settings-section-head">
+            <div class="badge-tag">CONTROLS CONFIG</div>
+            <h3>Custom Keybindings</h3>
+            <p class="settings-sub">Click a binding, then press any keyboard key or mouse button to rebind.</p>
+          </div>
+
+          <div class="keybinds-list">
+            <div class="keybind-item">
+              <span class="keybind-name">Shoot / Attack</span>
+              <button type="button" class="keybind-btn" data-action="shoot" id="bind-shoot">E / Left Click</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Dash / Sigma Shot</span>
+              <button type="button" class="keybind-btn" data-action="dash" id="bind-dash">SPACE</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Dodge / Deflect</span>
+              <button type="button" class="keybind-btn" data-action="parry" id="bind-parry">R</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Toggle Auto-Fire</span>
+              <button type="button" class="keybind-btn" data-action="autofire" id="bind-autofire">Q</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Move Forward</span>
+              <button type="button" class="keybind-btn" data-action="up" id="bind-up">W</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Move Backward</span>
+              <button type="button" class="keybind-btn" data-action="down" id="bind-down">S</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Move Left</span>
+              <button type="button" class="keybind-btn" data-action="left" id="bind-left">A</button>
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Move Right</span>
+              <button type="button" class="keybind-btn" data-action="right" id="bind-right">D</button>
+            </div>
+          </div>
+          <button type="button" id="reset-keybinds" class="btn btn-secondary btn-sm" style="margin-top: 6px; width: 100%;">Reset Default Keybindings</button>
         </div>
         <div class="settings-actions">
           <button id="resume-button" class="btn btn-primary hidden">Resume Match <span class="btn-sub">[ESC]</span></button>
@@ -1560,6 +1934,47 @@
         </div>
       </div>
     </section>
+
+    <!-- SIGMA TOM UNLOCK CELEBRATION MODAL -->
+    <div id="sigma-unlock-modal" class="sigma-unlock-modal hidden">
+      <div class="sigma-modal-backdrop"></div>
+      <div class="sigma-modal-card surface">
+        <div class="sigma-badge-pill">★ CHASSIS CLASSIFIED UPGRADE ★</div>
+        <div class="sigma-portrait-frame">
+          <img id="sigma-unlock-portrait" src="" alt="Sigma Tom" />
+          <div class="sigma-glow-ring"></div>
+        </div>
+        <h2 class="sigma-title">SIGMA TOM <span>UNLOCKED</span></h2>
+        <p class="sigma-quote">"Rule the arena with supreme composure and devastating firepower."</p>
+        <div class="sigma-perks">
+          <div class="sigma-perk">
+            <span class="perk-icon">💥</span>
+            <div class="perk-info">
+              <strong>3x Mega Bullets (2x Damage)</strong>
+              <p>Heavy plasma spheres deal double damage at slower velocity</p>
+            </div>
+          </div>
+          <div class="sigma-perk">
+            <span class="perk-icon">🛡️</span>
+            <div class="perk-info">
+              <strong>0.5x Dodge Cooldown</strong>
+              <p>Half cooldown time on deflect for rapid defense</p>
+            </div>
+          </div>
+          <div class="sigma-perk">
+            <span class="perk-icon">🌀</span>
+            <div class="perk-info">
+              <strong>Sigma Spiral Shot</strong>
+              <p>Dash replaced by a 16-orb expanding circular spiral barrage</p>
+            </div>
+          </div>
+        </div>
+        <div class="sigma-actions">
+          <button id="btn-equip-sigma" class="btn btn-primary btn-glow" type="button">EQUIP & BECOME SIGMA TOM</button>
+          <button id="btn-close-sigma" class="btn" type="button">Continue Battle</button>
+        </div>
+      </div>
+    </div>
 
     <p id="error"></p>
   </body>
