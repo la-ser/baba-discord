@@ -26,6 +26,7 @@ const PORT = Number(process.env.PORT || 8080),
 const CHARACTER_STATS = {
   granny: { width: 34, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500 },
   cyborg: { width: 91, height: 108, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500 },
+  mama_cyborg: { width: 91, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000 },
   sigmatom: { width: 62, height: 75, speed: 215, damage: 4.5, bulletRadius: 15, bulletSpeed: 338, parryCooldown: 2250 },
 };
 const OBJECT_CONFIG = {
@@ -80,7 +81,7 @@ function getLevelForXp(xp) {
   if (xp >= 320) return 6;
   if (xp >= 220) return 5;
   if (xp >= 140) return 4;
-  if (xp >= 75) return 3; // Unlocks Sigma Tom
+  if (xp >= 75) return 3;
   if (xp >= 30) return 2;
   return 1;
 }
@@ -264,12 +265,17 @@ app.use(
 app.get("/health", (req, res) => res.json({ ok: true, players: players.size }));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 io.use(async (socket, next) => {
-  const { accessToken, instanceId } = socket.handshake.auth || {};
-  if (accessToken === "dev-token") {
+  const { accessToken, instanceId, guestName } = socket.handshake.auth || {};
+  if (accessToken === "dev-token" || !accessToken || accessToken.startsWith("guest-")) {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const validGuest = (typeof guestName === "string" && /^Guest\d{4}$/.test(guestName))
+      ? guestName
+      : `Guest${randomNum}`;
     socket.data.identity = {
-      id: "dev-" + socket.id.slice(0, 6),
-      name: "Pilot " + socket.id.slice(0, 4),
-      instanceId: instanceId || "dev-arena",
+      id: "guest-" + validGuest,
+      name: validGuest,
+      instanceId: instanceId || "browser-arena",
+      isGuest: true,
     };
     return next();
   }
@@ -358,6 +364,8 @@ io.on("connection", (socket) => {
     serverTime: Date.now(),
     xp: p.xp,
     level: p.level,
+    name: p.name,
+    discordId: p.discordId,
   });
   socket.on("time_sync", (acknowledge) => {
     if (typeof acknowledge === "function") acknowledge(Date.now());
@@ -371,24 +379,40 @@ io.on("connection", (socket) => {
       p.lastInputSeq = Math.max(p.lastInputSeq, payload.sequence);
   });
   socket.on("character", (character) => {
-    if (!p.active && (character === "granny" || character === "cyborg" || character === "sigmatom")) {
-      p.character = character;
-      const radius = characterRadius(character);
-      p.x = clamp(p.x, radius, WIDTH - radius);
-      p.y = clamp(p.y, radius, HEIGHT - radius);
+    if (!p.active) {
+      if (character === "mama_cyborg" && p.level < 10 && p.xp < 1000) return;
+      if (character === "granny" || character === "cyborg" || character === "mama_cyborg") {
+        p.character = character;
+        const radius = characterRadius(character);
+        p.x = clamp(p.x, radius, WIDTH - radius);
+        p.y = clamp(p.y, radius, HEIGHT - radius);
+      }
     }
   });
   socket.on("switch_character", (character) => {
-    if (character === "sigmatom" && (p.level >= 3 || p.xp >= 75)) {
-      p.character = "sigmatom";
-      const radius = characterRadius(character);
-      p.x = clamp(p.x, radius, WIDTH - radius);
-      p.y = clamp(p.y, radius, HEIGHT - radius);
-      io.to(room).emit("character_switched", {
-        playerId: p.id,
-        character: "sigmatom",
-      });
-    }
+    const validCharacters = ["granny", "cyborg", "mama_cyborg", "sigmatom"];
+    if (!validCharacters.includes(character)) return;
+    if (character === "mama_cyborg" && (p.level < 10 && p.xp < 1000)) return;
+    p.character = character;
+    const radius = characterRadius(character);
+    p.x = clamp(p.x, radius, WIDTH - radius);
+    p.y = clamp(p.y, radius, HEIGHT - radius);
+    io.to(room).emit("character_switched", {
+      playerId: p.id,
+      character: p.character,
+    });
+  });
+  socket.on("tom_aura", () => {
+    const now = Date.now();
+    if (!p.active || p.health <= 0 || p.character !== "sigmatom") return;
+    if (p.lastTomAuraAt && now - p.lastTomAuraAt < 1200) return;
+    p.lastTomAuraAt = now;
+    io.to(room).emit("tom_aura_played", {
+      playerId: p.id,
+      x: p.x,
+      y: p.y,
+      timestamp: now,
+    });
   });
   socket.on("active", (active) => {
     const nextActive = active === true;
@@ -546,6 +570,7 @@ io.on("connection", (socket) => {
     const bSpeed = stats.bulletSpeed || BULLET_SPEED;
     const bRadius = stats.bulletRadius || BULLET_RADIUS;
     const muzzleDistance = characterRadius(p.character) + bRadius + 4;
+    const isMama = p.character === "mama_cyborg";
     bullets.push({
       id: nextBulletId++,
       ownerId: p.id,
@@ -557,7 +582,9 @@ io.on("connection", (socket) => {
       radius: bRadius,
       damage: stats.damage,
       character: p.character,
-      expiresAt: now + (p.character === "sigmatom" ? 2400 : BULLET_LIFETIME),
+      canSplit: isMama,
+      splitAt: isMama ? now + 2000 : 0,
+      expiresAt: now + (p.character === "sigmatom" ? 2400 : (isMama ? 2200 : BULLET_LIFETIME)),
     });
   });
   socket.on("disconnect", () => {
@@ -595,7 +622,7 @@ function awardXp(player, amount) {
       playerId: player.id,
       name: player.name,
       level: newLevel,
-      unlockedSigmaTom: newLevel >= 3,
+      unlockedMamaCyborg: newLevel >= 10,
     });
   }
 }
@@ -719,6 +746,55 @@ setInterval(() => {
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
     const bRadius = bullet.radius || BULLET_RADIUS;
+    if (bullet.canSplit && wallNow >= bullet.splitAt) {
+      bullet.canSplit = false;
+      const bSpeed = Math.hypot(bullet.vx, bullet.vy) || 480;
+      const ux = bullet.vx / bSpeed;
+      const uy = bullet.vy / bSpeed;
+      const leftVx = uy * bSpeed;
+      const leftVy = -ux * bSpeed;
+      const rightVx = -uy * bSpeed;
+      const rightVy = ux * bSpeed;
+      const splitLifetime = 2000;
+      bullets.push({
+        id: nextBulletId++,
+        ownerId: bullet.ownerId,
+        room: bullet.room,
+        x: bullet.x,
+        y: bullet.y,
+        vx: leftVx,
+        vy: leftVy,
+        radius: bullet.radius,
+        damage: bullet.damage,
+        character: "mama_cyborg_split",
+        canSplit: false,
+        splitAt: 0,
+        expiresAt: wallNow + splitLifetime,
+      });
+      bullets.push({
+        id: nextBulletId++,
+        ownerId: bullet.ownerId,
+        room: bullet.room,
+        x: bullet.x,
+        y: bullet.y,
+        vx: rightVx,
+        vy: rightVy,
+        radius: bullet.radius,
+        damage: bullet.damage,
+        character: "mama_cyborg_split",
+        canSplit: false,
+        splitAt: 0,
+        expiresAt: wallNow + splitLifetime,
+      });
+      io.to(bullet.room).emit("bullet_split", {
+        x: bullet.x,
+        y: bullet.y,
+        character: "mama_cyborg",
+      });
+      bullets.splice(i, 1);
+      continue;
+    }
+
     if (
       wallNow >= bullet.expiresAt ||
       bullet.x < -bRadius ||
@@ -810,7 +886,9 @@ setInterval(() => {
       bullet.ownerId = defender.id;
       bullet.character = defender.character;
       bullet.damage = CHARACTER_STATS[defender.character].damage;
-      bullet.expiresAt = wallNow + BULLET_LIFETIME;
+      bullet.canSplit = defender.character === "mama_cyborg";
+      bullet.splitAt = defender.character === "mama_cyborg" ? wallNow + 2000 : 0;
+      bullet.expiresAt = wallNow + (defender.character === "mama_cyborg" ? 2000 : BULLET_LIFETIME);
       io.to(bullet.room).emit("shot_deflected", {
         playerId: defender.id,
         x: bullet.x,
@@ -937,7 +1015,7 @@ setInterval(() => {
           vx,
           vy,
           character,
-          radius: radius || (character === "sigmatom" ? 15 : (character === "sigmatom_spiral" ? 8 : (character === "cyborg" ? 6.5 : 5))),
+          radius: radius || (character === "sigmatom" ? 15 : (character === "sigmatom_spiral" ? 8 : (character === "mama_cyborg" || character === "mama_cyborg_split" ? 8 : (character === "cyborg" ? 6.5 : 5)))),
         })),
     });
   }

@@ -580,60 +580,67 @@
         background: rgba(255, 255, 255, 0.1);
       }
 
-      /* Minimap (Top Left) */
+      /* Minimap / Radar (Top Left) */
       #minimap-panel {
         position: absolute;
         left: 14px;
         top: 14px;
         z-index: 10;
-        padding: 6px 8px 8px;
-        background: rgba(6, 10, 18, 0.82);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        padding: 8px 10px 10px;
+        background: linear-gradient(145deg, rgba(8, 14, 26, 0.92), rgba(4, 7, 15, 0.96));
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 229, 255, 0.22);
+        border-radius: 12px;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 20px rgba(0, 229, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
         pointer-events: none;
       }
       .minimap-title {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 5px;
+        margin-bottom: 6px;
         color: var(--text-muted);
         font-family: var(--font-mono);
-        font-size: 8px;
+        font-size: 8.5px;
         font-weight: 800;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
       }
       .radar-tag {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
+        color: var(--accent-cyan);
       }
       .radar-live-dot {
-        width: 5px;
-        height: 5px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background: #00ff9d;
-        box-shadow: 0 0 6px #00ff9d;
-        animation: pulse 1.5s infinite;
+        box-shadow: 0 0 8px #00ff9d;
+        animation: pulse 1.4s infinite;
       }
       @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.4; transform: scale(0.85); }
+        50% { opacity: 0.35; transform: scale(0.8); }
       }
       .leader-key {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
         color: var(--accent-gold);
-        font-size: 8px;
+        font-size: 8.5px;
+        font-weight: 900;
+        text-shadow: 0 0 8px rgba(255, 190, 26, 0.5);
       }
       #minimap {
         display: block;
-        width: 136px;
-        height: 76px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        background: #040711;
+        width: 160px;
+        height: 90px;
+        border-radius: 8px;
+        border: 1px solid rgba(0, 229, 255, 0.16);
+        background: #03060e;
+        box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.85);
       }
 
       /* Leaderboard (Top Right) */
@@ -1370,6 +1377,22 @@
         letter-spacing: 0.05em;
         white-space: nowrap;
       }
+      .character-card[data-character="mama_cyborg"].selected {
+        border-color: #f43f5e;
+        background: rgba(244, 63, 94, 0.08);
+        box-shadow: 0 0 0 1px #f43f5e, 0 12px 30px rgba(244, 63, 94, 0.35);
+      }
+      .character-card[data-character="mama_cyborg"].selected::after {
+        color: #f43f5e;
+      }
+      .character-card[data-character="mama_cyborg"] .portrait {
+        background: radial-gradient(circle, rgba(244, 63, 94, 0.15), transparent 70%);
+      }
+      .character-card[data-character="mama_cyborg"] img {
+        max-height: 120px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 12px rgba(244, 63, 94, 0.4));
+      }
       .character-card[data-character="sigmatom"].selected {
         border-color: #a855f7;
         background: rgba(168, 85, 247, 0.08);
@@ -1603,7 +1626,7 @@
         box-shadow: 0 0 35px rgba(219, 39, 119, 0.8) !important;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-dKri_-e0.js"></script>
+    <script type="module" crossorigin src="/assets/index-cKeDvbRE.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -1652,10 +1675,10 @@
         <!-- Minimap (Top Left) -->
         <div id="minimap-panel" class="hidden">
           <div class="minimap-title">
-            <span class="radar-tag"><span class="radar-live-dot"></span>RADAR</span>
-            <span class="leader-key">◆ LEADER</span>
+            <span class="radar-tag"><span class="radar-live-dot"></span>TACTICAL RADAR</span>
+            <span class="leader-key" id="radar-leader-indicator">👑 #1 TARGET</span>
           </div>
-          <canvas id="minimap" width="360" height="202" aria-label="Tactical Scanner"></canvas>
+          <canvas id="minimap" width="320" height="180" aria-label="Tactical Scanner"></canvas>
         </div>
 
         <!-- Leaderboard (Top Right) -->
@@ -1825,18 +1848,18 @@
               </div>
             </span>
           </button>
-          <button class="character-card locked" data-character="sigmatom" id="card-sigmatom">
-            <span class="portrait"><img id="sigmatom-portrait" alt="Sigma Tom" /></span>
+          <button class="character-card locked" data-character="mama_cyborg" id="card-mama_cyborg">
+            <span class="portrait"><img id="mama_cyborg-portrait" alt="Mama Cyborg" /></span>
             <span class="character-copy">
               <div class="card-head">
-                <h3>Sigma Tom</h3>
-                <span class="lock-indicator" id="sigmatom-lock-indicator">🔒 LVL 3 (75 XP)</span>
+                <h3>Mama Cyborg</h3>
+                <span class="lock-indicator" id="mama_cyborg-lock-indicator">🔒 LVL 10 (1000 XP)</span>
               </div>
-              <p>The ultimate operative. 3x Mega Bullets (2x DMG), halved dodge cooldown, and 16-orb Sigma Spiral Shot.</p>
+              <p>Hyper-velocity chassis. Fires high-speed Vector Plasma that splits into a T after 2 seconds to flank foes.</p>
               <div class="stats">
-                <div class="stat">Speed <span class="meter"><i style="--value:72%"></i></span></div>
-                <div class="stat">Damage <span class="meter"><i style="--value:98%"></i></span></div>
-                <div class="stat">Profile <span class="meter"><i style="--value:64%"></i></span></div>
+                <div class="stat">Speed <span class="meter"><i style="--value:95%"></i></span></div>
+                <div class="stat">Damage <span class="meter"><i style="--value:82%"></i></span></div>
+                <div class="stat">Profile <span class="meter"><i style="--value:85%"></i></span></div>
               </div>
             </span>
           </button>
@@ -1935,43 +1958,43 @@
       </div>
     </section>
 
-    <!-- SIGMA TOM UNLOCK CELEBRATION MODAL -->
-    <div id="sigma-unlock-modal" class="sigma-unlock-modal hidden">
+    <!-- MAMA CYBORG UNLOCK CELEBRATION MODAL -->
+    <div id="mama-unlock-modal" class="sigma-unlock-modal hidden">
       <div class="sigma-modal-backdrop"></div>
       <div class="sigma-modal-card surface">
-        <div class="sigma-badge-pill">★ CHASSIS CLASSIFIED UPGRADE ★</div>
+        <div class="sigma-badge-pill">★ LEVEL 10 REWARD UNLOCKED ★</div>
         <div class="sigma-portrait-frame">
-          <img id="sigma-unlock-portrait" src="" alt="Sigma Tom" />
+          <img id="mama-unlock-portrait" src="" alt="Mama Cyborg" />
           <div class="sigma-glow-ring"></div>
         </div>
-        <h2 class="sigma-title">SIGMA TOM <span>UNLOCKED</span></h2>
-        <p class="sigma-quote">"Rule the arena with supreme composure and devastating firepower."</p>
+        <h2 class="sigma-title">MAMA CYBORG <span>UNLOCKED</span></h2>
+        <p class="sigma-quote">"Unmatched velocity and revolutionary T-Split Vector Plasma technology."</p>
         <div class="sigma-perks">
           <div class="sigma-perk">
-            <span class="perk-icon">💥</span>
+            <span class="perk-icon">⚡</span>
             <div class="perk-info">
-              <strong>3x Mega Bullets (2x Damage)</strong>
-              <p>Heavy plasma spheres deal double damage at slower velocity</p>
+              <strong>Hyper-Velocity Drives</strong>
+              <p>Top speed tier across the entire arena chassis roster</p>
+            </div>
+          </div>
+          <div class="sigma-perk">
+            <span class="perk-icon">🔱</span>
+            <div class="perk-info">
+              <strong>T-Split Vector Plasma</strong>
+              <p>Directional plasma splits after 2 seconds into perpendicular left & right flanking shots</p>
             </div>
           </div>
           <div class="sigma-perk">
             <span class="perk-icon">🛡️</span>
             <div class="perk-info">
-              <strong>0.5x Dodge Cooldown</strong>
-              <p>Half cooldown time on deflect for rapid defense</p>
-            </div>
-          </div>
-          <div class="sigma-perk">
-            <span class="perk-icon">🌀</span>
-            <div class="perk-info">
-              <strong>Sigma Spiral Shot</strong>
-              <p>Dash replaced by a 16-orb expanding circular spiral barrage</p>
+              <strong>Reinforced Deflect Field</strong>
+              <p>High-efficiency tactical parry shield</p>
             </div>
           </div>
         </div>
         <div class="sigma-actions">
-          <button id="btn-equip-sigma" class="btn btn-primary btn-glow" type="button">EQUIP & BECOME SIGMA TOM</button>
-          <button id="btn-close-sigma" class="btn" type="button">Continue Battle</button>
+          <button id="btn-equip-mama" class="btn btn-primary btn-glow" type="button">EQUIP MAMA CYBORG</button>
+          <button id="btn-close-mama" class="btn" type="button">Continue Battle</button>
         </div>
       </div>
     </div>
