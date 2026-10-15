@@ -27,6 +27,7 @@ const CHARACTER_STATS = {
   granny: { width: 34, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
   cyborg: { width: 91, height: 108, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
   mama_cyborg: { width: 91, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
+  angry_granny: { width: 58, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
   sigmatom: { width: 186, height: 225, speed: 215, damage: 4.5, bulletRadius: 20, bulletSpeed: 1014, parryCooldown: 2250, maxHealth: 200 },
 };
 function getMaxHealth(character) {
@@ -387,8 +388,8 @@ io.on("connection", (socket) => {
   });
   socket.on("character", (character) => {
     if (!p.active) {
-      if (character === "mama_cyborg" && p.level < 10 && p.xp < 1000) return;
-      if (character === "granny" || character === "cyborg" || character === "mama_cyborg") {
+      if ((character === "mama_cyborg" || character === "angry_granny") && p.level < 10 && p.xp < 1000) return;
+      if (character === "granny" || character === "cyborg" || character === "mama_cyborg" || character === "angry_granny") {
         p.character = character;
         p.health = getMaxHealth(character);
         const radius = characterRadius(character);
@@ -398,9 +399,9 @@ io.on("connection", (socket) => {
     }
   });
   socket.on("switch_character", (character) => {
-    const validCharacters = ["granny", "cyborg", "mama_cyborg", "sigmatom"];
+    const validCharacters = ["granny", "cyborg", "mama_cyborg", "angry_granny", "sigmatom"];
     if (!validCharacters.includes(character)) return;
-    if (character === "mama_cyborg" && (p.level < 10 && p.xp < 1000)) return;
+    if ((character === "mama_cyborg" || character === "angry_granny") && (p.level < 10 && p.xp < 1000)) return;
     p.character = character;
     p.health = getMaxHealth(character);
     p.soundwaveActive = false;
@@ -512,8 +513,8 @@ io.on("connection", (socket) => {
     )
       return;
 
-    // Sigma Tom & Mama Cyborg Dash is replaced by the Shield Ability + 16-bullet Spiral Barrier!
-    if (p.character === "sigmatom" || p.character === "mama_cyborg" || payload?.sigmaShot) {
+    // Sigma Tom, Mama Cyborg & Angry Granny Dash is replaced by the Shield Ability + 16-bullet Spiral Barrier!
+    if (p.character === "sigmatom" || p.character === "mama_cyborg" || p.character === "angry_granny" || payload?.sigmaShot) {
       p.dashReadyAt = now + DASH_COOLDOWN;
       // Activate deflect parry shield so incoming shots are deflected!
       p.parryId += 1;
@@ -523,10 +524,12 @@ io.on("connection", (socket) => {
       p.parryReadyAt = now + (stats.parryCooldown || PARRY_COOLDOWN);
 
       const isMama = p.character === "mama_cyborg";
+      const isAngry = p.character === "angry_granny";
+      const isEvolution = isMama || isAngry;
       const NUM_SPIRAL = 16;
-      const bulletChar = isMama ? "mama_cyborg_spiral" : "sigmatom_spiral";
-      const bRad = isMama ? 9 : 10;
-      const bDmg = isMama ? 2.2 : 2.0;
+      const bulletChar = isAngry ? "angry_granny_spiral" : (isMama ? "mama_cyborg_spiral" : "sigmatom_spiral");
+      const bRad = isEvolution ? 9 : 10;
+      const bDmg = isEvolution ? 2.2 : 2.0;
       const spawnDist = characterRadius(p.character) + 20;
 
       for (let i = 0; i < NUM_SPIRAL; i++) {
@@ -627,6 +630,8 @@ io.on("connection", (socket) => {
     const bRadius = stats.bulletRadius || BULLET_RADIUS;
     const muzzleDistance = characterRadius(p.character) + bRadius + 4;
     const isMama = p.character === "mama_cyborg";
+    const isAngry = p.character === "angry_granny";
+    const canSplit = isMama || isAngry;
     bullets.push({
       id: nextBulletId++,
       ownerId: p.id,
@@ -639,9 +644,9 @@ io.on("connection", (socket) => {
       damage: stats.damage,
       character: p.character,
       homing: p.character === "sigmatom",
-      canSplit: isMama,
-      splitAt: isMama ? now + 1000 : 0,
-      expiresAt: now + (p.character === "sigmatom" ? 2800 : (isMama ? 1200 : BULLET_LIFETIME)),
+      canSplit: canSplit,
+      splitAt: canSplit ? now + 1000 : 0,
+      expiresAt: now + (p.character === "sigmatom" ? 2800 : (canSplit ? 1200 : BULLET_LIFETIME)),
     });
   });
   socket.on("disconnect", () => {
@@ -974,6 +979,8 @@ setInterval(() => {
       const rightVx = -uy * bSpeed;
       const rightVy = ux * bSpeed;
       const splitLifetime = 2000;
+      const isAngry = bullet.character === "angry_granny";
+      const splitChar = isAngry ? "angry_granny_split" : "mama_cyborg_split";
       bullets.push({
         id: nextBulletId++,
         ownerId: bullet.ownerId,
@@ -984,7 +991,7 @@ setInterval(() => {
         vy: leftVy,
         radius: bullet.radius,
         damage: bullet.damage,
-        character: "mama_cyborg_split",
+        character: splitChar,
         canSplit: false,
         splitAt: 0,
         expiresAt: wallNow + splitLifetime,
@@ -999,7 +1006,7 @@ setInterval(() => {
         vy: rightVy,
         radius: bullet.radius,
         damage: bullet.damage,
-        character: "mama_cyborg_split",
+        character: splitChar,
         canSplit: false,
         splitAt: 0,
         expiresAt: wallNow + splitLifetime,
@@ -1007,7 +1014,7 @@ setInterval(() => {
       io.to(bullet.room).emit("bullet_split", {
         x: bullet.x,
         y: bullet.y,
-        character: "mama_cyborg",
+        character: isAngry ? "angry_granny" : "mama_cyborg",
       });
       bullets.splice(i, 1);
       continue;
@@ -1104,9 +1111,9 @@ setInterval(() => {
       bullet.ownerId = defender.id;
       bullet.character = defender.character;
       bullet.damage = CHARACTER_STATS[defender.character].damage;
-      bullet.canSplit = defender.character === "mama_cyborg";
-      bullet.splitAt = defender.character === "mama_cyborg" ? wallNow + 1000 : 0;
-      bullet.expiresAt = wallNow + (defender.character === "mama_cyborg" ? 1200 : BULLET_LIFETIME);
+      bullet.canSplit = defender.character === "mama_cyborg" || defender.character === "angry_granny";
+      bullet.splitAt = (defender.character === "mama_cyborg" || defender.character === "angry_granny") ? wallNow + 1000 : 0;
+      bullet.expiresAt = wallNow + ((defender.character === "mama_cyborg" || defender.character === "angry_granny") ? 1200 : BULLET_LIFETIME);
       io.to(bullet.room).emit("shot_deflected", {
         playerId: defender.id,
         x: bullet.x,
@@ -1150,7 +1157,7 @@ setInterval(() => {
         hit.xp = Math.floor((hit.xp || 0) * 0.5);
         hit.level = getLevelForXp(hit.xp);
 
-        // If player had Mama Cyborg and dropped below level 10, revert back to cyborg
+        // If player had an evolved form and dropped below level 10, revert back to their base character
         let demoted = false;
         if (hit.character === "mama_cyborg" && hit.level < 10) {
           hit.character = "cyborg";
@@ -1158,6 +1165,13 @@ setInterval(() => {
           io.to(hit.room).emit("character_switched", {
             playerId: hit.id,
             character: "cyborg",
+          });
+        } else if (hit.character === "angry_granny" && hit.level < 10) {
+          hit.character = "granny";
+          demoted = true;
+          io.to(hit.room).emit("character_switched", {
+            playerId: hit.id,
+            character: "granny",
           });
         }
 
@@ -1261,7 +1275,7 @@ setInterval(() => {
           vx,
           vy,
           character,
-          radius: radius || (character === "sigmatom" ? 20 : (character === "sigmatom_spiral" ? 10 : (character === "mama_cyborg" || character === "mama_cyborg_split" || character === "mama_cyborg_spiral" ? 9 : (character === "cyborg" ? 6.5 : 5)))),
+          radius: radius || (character === "sigmatom" ? 20 : (character === "sigmatom_spiral" ? 10 : (character === "mama_cyborg" || character === "mama_cyborg_split" || character === "mama_cyborg_spiral" || character === "angry_granny" || character === "angry_granny_split" || character === "angry_granny_spiral" ? 8 : (character === "cyborg" ? 6.5 : 5)))),
         })),
     });
   }

@@ -1393,6 +1393,22 @@
         object-fit: contain;
         filter: drop-shadow(0 4px 12px rgba(244, 63, 94, 0.4));
       }
+      .character-card[data-character="angry_granny"].selected {
+        border-color: #f97316;
+        background: rgba(249, 115, 22, 0.08);
+        box-shadow: 0 0 0 1px #f97316, 0 12px 30px rgba(249, 115, 22, 0.35);
+      }
+      .character-card[data-character="angry_granny"].selected::after {
+        color: #f97316;
+      }
+      .character-card[data-character="angry_granny"] .portrait {
+        background: radial-gradient(circle, rgba(249, 115, 22, 0.15), transparent 70%);
+      }
+      .character-card[data-character="angry_granny"] img {
+        max-height: 120px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 12px rgba(249, 115, 22, 0.4));
+      }
       .character-card[data-character="sigmatom"].selected {
         border-color: #a855f7;
         background: rgba(168, 85, 247, 0.08);
@@ -1626,7 +1642,7 @@
         box-shadow: 0 0 35px rgba(219, 39, 119, 0.8) !important;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CX47vV3J.js"></script>
+    <script type="module" crossorigin src="/assets/index-Clwbmgjl.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -1867,6 +1883,21 @@
               </div>
             </span>
           </button>
+          <button class="character-card locked" data-character="angry_granny" id="card-angry_granny">
+            <span class="portrait"><img id="angry_granny-portrait" alt="Angry Granny" /></span>
+            <span class="character-copy">
+              <div class="card-head">
+                <h3>Angry Granny</h3>
+                <span class="lock-indicator" id="angry_granny-lock-indicator">🔒 LVL 10 (1000 XP)</span>
+              </div>
+              <p>Furious hyper-evolution with 2.5x Health & Space Deflect Shield. Fires high-speed Vector Needles that split into a T after 1 second.</p>
+              <div class="stats">
+                <div class="stat">Speed <span class="meter"><i style="--value:95%"></i></span></div>
+                <div class="stat">Damage <span class="meter"><i style="--value:82%"></i></span></div>
+                <div class="stat">Profile <span class="meter"><i style="--value:60%"></i></span></div>
+              </div>
+            </span>
+          </button>
         </div>
         <div class="roster-actions">
           <button id="character-back" class="btn">Back</button>
@@ -1985,8 +2016,8 @@
           <img id="mama-unlock-portrait" src="" alt="Mama Cyborg" />
           <div class="sigma-glow-ring"></div>
         </div>
-        <h2 class="sigma-title">MAMA CYBORG <span>UNLOCKED</span></h2>
-        <p class="sigma-quote">"Unmatched velocity and revolutionary T-Split Vector Plasma technology."</p>
+        <h2 class="sigma-title" id="mama-unlock-title">MAMA CYBORG <span>UNLOCKED</span></h2>
+        <p class="sigma-quote" id="mama-unlock-quote">"Unmatched velocity and revolutionary T-Split Vector Plasma technology."</p>
         <div class="sigma-perks">
           <div class="sigma-perk">
             <span class="perk-icon">⚡</span>
@@ -1998,15 +2029,15 @@
           <div class="sigma-perk">
             <span class="perk-icon">🔱</span>
             <div class="perk-info">
-              <strong>T-Split Vector Plasma</strong>
-              <p>Directional plasma splits after 1 second into perpendicular left & right flanking shots</p>
+              <strong id="mama-unlock-weapon-title">T-Split Vector Plasma</strong>
+              <p id="mama-unlock-weapon-desc">Directional projectiles split after 1 second into perpendicular left & right flanking shots</p>
             </div>
           </div>
           <div class="sigma-perk">
             <span class="perk-icon">🛡️</span>
             <div class="perk-info">
-              <strong>Reinforced Deflect Field</strong>
-              <p>High-efficiency tactical parry shield</p>
+              <strong>2.5x Health & Space Deflect Shield</strong>
+              <p>50 HP with Spacebar Parry Deflect Shield & 16-bullet spiral barrier</p>
             </div>
           </div>
         </div>
