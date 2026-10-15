@@ -549,7 +549,7 @@ io.on("connection", (socket) => {
       !p.active ||
       p.health <= 0 ||
       now < p.parryUntil ||
-      now - p.lastShotAt < (p.minigun ? MINIGUN_COOLDOWN : SHOT_COOLDOWN) ||
+      now - p.lastShotAt < ((p.character === "sigmatom" || p.minigun) ? MINIGUN_COOLDOWN : SHOT_COOLDOWN) ||
       !target ||
       !Number.isFinite(target.x) ||
       !Number.isFinite(target.y) ||
@@ -583,8 +583,8 @@ io.on("connection", (socket) => {
       damage: stats.damage,
       character: p.character,
       canSplit: isMama,
-      splitAt: isMama ? now + 2000 : 0,
-      expiresAt: now + (p.character === "sigmatom" ? 2400 : (isMama ? 2200 : BULLET_LIFETIME)),
+      splitAt: isMama ? now + 1000 : 0,
+      expiresAt: now + (p.character === "sigmatom" ? 2400 : (isMama ? 1200 : BULLET_LIFETIME)),
     });
   });
   socket.on("disconnect", () => {
