@@ -23,8 +23,8 @@ fi
 
 echo ">>> [4/4] Checking PM2 process ($APP_NAME)..."
 if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
-  echo ">>> '$APP_NAME' is already running in PM2. Restarting..."
-  pm2 restart "$APP_NAME"
+  echo ">>> '$APP_NAME' is already registered in PM2. Restarting with updated environment..."
+  pm2 restart "$APP_NAME" --update-env
 else
   echo ">>> No PM2 instance found for '$APP_NAME'. Creating and starting it..."
   if [ -f ecosystem.config.cjs ]; then

@@ -1,7 +1,7 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env"), override: true });
 const express = require("express"),
-  http = require("http"),
-  path = require("path");
+  http = require("http");
 const { Server } = require("socket.io");
 const { createScaledMask } = require("./collision-masks.cjs");
 const app = express(),
