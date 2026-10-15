@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "baba-discord",
+      name: "Baba-Cyborg-DC",
       script: "server.cjs",
       cwd: __dirname,
       instances: 1,
