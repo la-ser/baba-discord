@@ -58,12 +58,11 @@ pm2 startup
 
 ## Updating the Server
 
-When updates are pushed to this repo, update your server with:
+When updates are pushed to this repo, update your server simply by running:
 ```bash
-git pull
-npm install --omit=dev
-pm2 restart baba-discord
+./update.sh
 ```
+This pulls the latest Git commits, installs dependencies, and restarts (or starts) `Baba-Cyborg-DC` in PM2.
 
 ---
 
