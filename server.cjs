@@ -190,6 +190,159 @@ function sweptBulletTouchesCircle(bullet, prevX, prevY, cx, cy, cRadius) {
 
 const hordeGames = new Map();
 
+const HORDE_CARDS = {
+  // Ability Cards (Rare, Individual, Non-Stackable)
+  ability_dash: {
+    id: "ability_dash",
+    category: "ability",
+    rarity: "rare",
+    name: "Dash Thrusters",
+    desc: "Unlock Spacebar Dash. Burst forward with a high-speed surge to escape danger.",
+    icon: "⚡",
+    condition: (player, horde) => !player.hasDash,
+    apply: (player, horde) => { player.hasDash = true; }
+  },
+  ability_dodge: {
+    id: "ability_dodge",
+    category: "ability",
+    rarity: "rare",
+    name: "Auto-Dodge Matrix",
+    desc: "Evasive cyber-roll automatically triggers when an enemy gets too close (6s cooldown).",
+    icon: "🌀",
+    condition: (player, horde) => !player.hasDodge,
+    apply: (player, horde) => { player.hasDodge = true; }
+  },
+
+  // Granny Utility Cards (Stackable team upgrades)
+  granny_turret: {
+    id: "granny_turret",
+    category: "utility",
+    rarity: "common",
+    name: "Granny Defense Cannon",
+    desc: "Granny statue auto-fires high-power plasma at nearest enemy. Stacking reduces fire delay.",
+    icon: "🔱",
+    condition: (player, horde) => true,
+    apply: (player, horde) => {
+      horde.grannyTurretLevel = (horde.grannyTurretLevel || 0) + 1;
+    }
+  },
+  granny_repair: {
+    id: "granny_repair",
+    category: "utility",
+    rarity: "common",
+    name: "Core Nanite Repair",
+    desc: "Instantly restore the Granny Core back to 100% full health.",
+    icon: "🔧",
+    condition: (player, horde) => horde.baseHealth < horde.maxBaseHealth,
+    apply: (player, horde) => {
+      horde.baseHealth = horde.maxBaseHealth;
+    }
+  },
+  granny_heal_aura: {
+    id: "granny_heal_aura",
+    category: "utility",
+    rarity: "uncommon",
+    name: "Bio-Regen Field",
+    desc: "Emits a protective rejuvenation ring around Granny that heals nearby players. Stacking increases rate and range.",
+    icon: "💚",
+    condition: (player, horde) => true,
+    apply: (player, horde) => {
+      horde.healAuraLevel = (horde.healAuraLevel || 0) + 1;
+    }
+  },
+
+  // Object Placement Cards
+  object_wall: {
+    id: "object_wall",
+    category: "object",
+    rarity: "common",
+    name: "Reinforced Barricade",
+    desc: "Deploy a sturdy defensive wall that blocks enemy pathing and absorbs melee attacks.",
+    icon: "🧱",
+    condition: (player, horde) => horde.placedObjects.filter(o => o.type === "wall").length < 12,
+    apply: (player, horde) => {
+      player.pendingPlacements = player.pendingPlacements || [];
+      player.pendingPlacements.push("wall");
+    }
+  },
+  object_turret: {
+    id: "object_turret",
+    category: "object",
+    rarity: "uncommon",
+    name: "Autonomous Sentry",
+    desc: "Deploy an automated sentry gun station that fires at approaching enemies within its radius.",
+    icon: "📡",
+    condition: (player, horde) => horde.placedObjects.filter(o => o.type === "turret").length < 6,
+    apply: (player, horde) => {
+      player.pendingPlacements = player.pendingPlacements || [];
+      player.pendingPlacements.push("turret");
+    }
+  },
+  object_trap: {
+    id: "object_trap",
+    category: "object",
+    rarity: "uncommon",
+    name: "Cryo Freeze Trap",
+    desc: "Deploy a floor trap that freezes any enemy walking over it for 5 seconds.",
+    icon: "❄️",
+    condition: (player, horde) => horde.placedObjects.filter(o => o.type === "trap").length < 6,
+    apply: (player, horde) => {
+      player.pendingPlacements = player.pendingPlacements || [];
+      player.pendingPlacements.push("trap");
+    }
+  },
+
+  // Object Upgrade Cards (ONLY appear when matching object is actually placed!)
+  turret_range: {
+    id: "turret_range",
+    category: "upgrade",
+    rarity: "common",
+    name: "Turret Radar Optics",
+    desc: "Upgrade all sentry turrets with +70px targeting and firing range.",
+    icon: "🔭",
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
+    apply: (player, horde) => {
+      horde.turretRangeBoost = (horde.turretRangeBoost || 0) + 70;
+    }
+  },
+  turret_cooldown: {
+    id: "turret_cooldown",
+    category: "upgrade",
+    rarity: "common",
+    name: "Turret Overclock",
+    desc: "Accelerate turret barrel cycling: reduce firing cooldown by 25%.",
+    icon: "⚙️",
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
+    apply: (player, horde) => {
+      horde.turretCooldownMult = (horde.turretCooldownMult || 1.0) * 0.75;
+    }
+  },
+  turret_damage: {
+    id: "turret_damage",
+    category: "upgrade",
+    rarity: "common",
+    name: "High-Caliber Rounds",
+    desc: "Increase all sentry turret bullet damage by +1.2 per shot.",
+    icon: "💥",
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
+    apply: (player, horde) => {
+      horde.turretDamageBoost = (horde.turretDamageBoost || 0) + 1.2;
+    }
+  },
+  trap_cooldown: {
+    id: "trap_cooldown",
+    category: "upgrade",
+    rarity: "common",
+    name: "Rapid Cryo Cycling",
+    desc: "Reduce trap recovery time after freeze from 5.0s down to 3.2s (or faster).",
+    icon: "⏱️",
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "trap"),
+    apply: (player, horde) => {
+      horde.trapRecoveryTime = Math.max(1200, (horde.trapRecoveryTime || 5000) - 1300);
+    }
+  }
+};
+
 class HordeGame {
   constructor(room) {
     this.room = room;
@@ -200,11 +353,41 @@ class HordeGame {
     this.intermissionUntil = 0;
     this.enemies = [];
     this.enemiesSpawnedThisWave = 0;
-    this.enemiesToSpawnThisWave = 14;
-    this.lastSpawnAt = Date.now() + 1000;
-    this.spawnInterval = 1750;
+    this.enemiesToSpawnThisWave = 6;
+    this.lastSpawnAt = Date.now() + 1500;
+    this.spawnInterval = 3200;
     this.nextEnemyId = 1;
     this.lastBaseDamageAt = 0;
+
+    // Placed Objects (Wall, Turret, Trap)
+    this.placedObjects = [];
+    this.nextObjectId = 1;
+
+    // Upgrades
+    this.grannyTurretLevel = 0;
+    this.lastGrannyShotAt = 0;
+    this.healAuraLevel = 0;
+    this.lastHealAuraPulseAt = 0;
+    this.turretRangeBoost = 0;
+    this.turretCooldownMult = 1.0;
+    this.turretDamageBoost = 0;
+    this.trapRecoveryTime = 5000;
+
+    // Upgrade Selection State
+    this.pendingPlayersToChoose = new Set();
+    this.cardOfferings = new Map();
+    this.upgradeTimeout = null;
+  }
+
+  getWaveEnemyCount(wave, playerCount) {
+    const base = 4 + wave * 2; // wave 1: 6, wave 2: 8, wave 3: 10
+    const playerMult = 0.65 + 0.35 * Math.max(1, playerCount);
+    return Math.max(5, Math.round(base * playerMult));
+  }
+
+  getSpawnInterval(wave, playerCount) {
+    const base = Math.max(1200, 3600 - (wave - 1) * 220);
+    return Math.max(750, Math.round(base / Math.sqrt(Math.max(1, playerCount))));
   }
 
   getAvailableTypesForWave(wave) {
@@ -215,7 +398,7 @@ class HordeGame {
     return Object.keys(ENEMY_CONFIG);
   }
 
-  spawnEnemy() {
+  spawnEnemy(activePlayerCount = 1) {
     const types = this.getAvailableTypesForWave(this.wave);
     const chosenType = types[Math.floor(Math.random() * types.length)];
     const config = ENEMY_CONFIG[chosenType];
@@ -223,6 +406,31 @@ class HordeGame {
     const spawnDist = ARENA_RADIUS - 120 + (Math.random() - 0.5) * 80;
     const x = ARENA_CENTER.x + Math.cos(angle) * spawnDist;
     const y = ARENA_CENTER.y + Math.sin(angle) * spawnDist;
+
+    // In Wave 1, all enemies have 1 HP (one-hit kill!)
+    // In Wave 2, 2 HP.
+    // In Wave 3+, scales smoothly with wave and enemy base tier
+    let hp;
+    let speed;
+    let damage;
+    if (this.wave === 1) {
+      hp = 1;
+      speed = Math.min(105, config.speed * 0.62);
+      damage = 1.0;
+    } else if (this.wave === 2) {
+      hp = 2;
+      speed = Math.min(125, config.speed * 0.76);
+      damage = 1.4;
+    } else if (this.wave === 3) {
+      hp = Math.max(2, Math.round(config.maxHp * 0.35));
+      speed = config.speed * 0.88;
+      damage = Math.max(1.5, config.damage * 0.75);
+    } else {
+      const waveProgress = Math.min(2.0, 0.4 + (this.wave - 3) * 0.15);
+      hp = Math.max(3, Math.round(config.maxHp * waveProgress));
+      speed = config.speed;
+      damage = config.damage;
+    }
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -232,18 +440,19 @@ class HordeGame {
       width: config.width,
       height: config.height,
       radius: config.radius,
-      speed: config.speed,
-      damage: config.damage,
-      maxHp: config.maxHp,
-      hp: config.maxHp,
+      speed: speed,
+      damage: damage,
+      maxHp: hp,
+      hp: hp,
       xp: config.xp,
-      hasDodge: config.hasDodge,
+      hasDodge: this.wave >= 2 ? config.hasDodge : false,
       dodgeCooldown: config.dodgeCooldown || 4000,
       dodgeDistance: config.dodgeDistance || 110,
       dodgeReadyAt: 0,
       dodgeUntil: 0,
       dodgeVx: 0,
       dodgeVy: 0,
+      frozenUntil: 0,
       x,
       y,
       facing: { x: -Math.cos(angle), y: -Math.sin(angle) },
@@ -255,18 +464,227 @@ class HordeGame {
     });
   }
 
+  generateCardOptions(player) {
+    const available = [];
+    for (const card of Object.values(HORDE_CARDS)) {
+      if (card.condition(player, this)) {
+        available.push(card);
+      }
+    }
+    const pool = [];
+    for (const card of available) {
+      let weight = 10;
+      if (card.category === "ability") weight = 4;
+      else if (card.rarity === "uncommon") weight = 8;
+      for (let i = 0; i < weight; i++) pool.push(card);
+    }
+
+    const chosen = [];
+    const chosenIds = new Set();
+    while (chosen.length < 3 && pool.length > 0) {
+      const rand = pool[Math.floor(Math.random() * pool.length)];
+      if (!chosenIds.has(rand.id)) {
+        chosenIds.add(rand.id);
+        chosen.push({
+          id: rand.id,
+          category: rand.category,
+          rarity: rand.rarity,
+          name: rand.name,
+          desc: rand.desc,
+          icon: rand.icon,
+        });
+      }
+      for (let i = pool.length - 1; i >= 0; i--) {
+        if (pool[i].id === rand.id) pool.splice(i, 1);
+      }
+    }
+    return chosen;
+  }
+
+  applyCardUpgrade(player, cardId, io) {
+    const card = HORDE_CARDS[cardId];
+    if (!card) return;
+    card.apply(player, this);
+
+    io.to(player.id).emit("upgrade_applied", {
+      cardId: card.id,
+      name: card.name,
+      category: card.category,
+      hasDash: player.hasDash === true,
+      hasDodge: player.hasDodge === true,
+    });
+
+    if (card.category === "object") {
+      const objectType = card.id.replace("object_", "");
+      io.to(player.id).emit("enter_placement_mode", { objectType });
+    }
+  }
+
+  startNextWave(io, roomPlayerIds) {
+    this.wave += 1;
+    this.waveState = "active";
+    const activeCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
+    this.enemiesSpawnedThisWave = 0;
+    this.enemiesToSpawnThisWave = this.getWaveEnemyCount(this.wave, activeCount);
+    this.spawnInterval = this.getSpawnInterval(this.wave, activeCount);
+    this.lastSpawnAt = Date.now() + 1500;
+    io.to(this.room).emit("wave_started", {
+      wave: this.wave,
+      totalEnemies: this.enemiesToSpawnThisWave,
+    });
+  }
+
   update(dt, wallNow, roomPlayerIds, bullets, io) {
+    const activePlayerCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
+
     if (this.waveState === "active") {
-      if (this.enemiesSpawnedThisWave < this.enemiesToSpawnThisWave) {
+      const maxAlive = Math.min(25, 4 + this.wave * 2 + activePlayerCount * 2);
+      if (this.enemiesSpawnedThisWave < this.enemiesToSpawnThisWave && this.enemies.length < maxAlive) {
         if (wallNow - this.lastSpawnAt >= this.spawnInterval) {
           this.lastSpawnAt = wallNow;
           this.enemiesSpawnedThisWave++;
-          this.spawnEnemy();
+          this.spawnEnemy(activePlayerCount);
         }
       }
     }
 
-    // Dodge trigger for rare evasive enemies
+    // When upgrading, gameplay is paused!
+    if (this.waveState === "upgrade_selection") {
+      return;
+    }
+
+    // 1. Granny Core Cannon firing
+    if (this.grannyTurretLevel > 0 && this.waveState === "active") {
+      const cooldown = Math.max(1000, 5000 - (this.grannyTurretLevel - 1) * 900);
+      if (wallNow - (this.lastGrannyShotAt || 0) >= cooldown) {
+        let closestEnemy = null;
+        let closestDist = 580;
+        for (const enemy of this.enemies) {
+          const d = Math.hypot(enemy.x - ARENA_CENTER.x, enemy.y - ARENA_CENTER.y);
+          if (d < closestDist) {
+            closestDist = d;
+            closestEnemy = enemy;
+          }
+        }
+        if (closestEnemy) {
+          this.lastGrannyShotAt = wallNow;
+          const angle = Math.atan2(closestEnemy.y - ARENA_CENTER.y, closestEnemy.x - ARENA_CENTER.x);
+          const damage = 2.5 + this.wave * 0.7;
+          bullets.push({
+            id: nextBulletId++,
+            room: this.room,
+            ownerId: "granny_statue",
+            x: ARENA_CENTER.x + Math.cos(angle) * 45,
+            y: ARENA_CENTER.y + Math.sin(angle) * 45,
+            vx: Math.cos(angle) * 620,
+            vy: Math.sin(angle) * 620,
+            damage,
+            radius: 8,
+            character: "granny_plasma",
+            bornAt: wallNow,
+            expiresAt: wallNow + 1500,
+          });
+          io.to(this.room).emit("granny_fired", {
+            angle,
+            targetX: closestEnemy.x,
+            targetY: closestEnemy.y,
+          });
+        }
+      }
+    }
+
+    // 2. Granny Healing Aura pulse
+    if (this.healAuraLevel > 0) {
+      const cooldown = Math.max(1200, 3200 - (this.healAuraLevel - 1) * 600);
+      if (wallNow - (this.lastHealAuraPulseAt || 0) >= cooldown) {
+        this.lastHealAuraPulseAt = wallNow;
+        const radius = 220 + this.healAuraLevel * 20;
+        const healAmt = 2 + Math.floor(this.healAuraLevel * 0.5);
+
+        for (const pid of roomPlayerIds) {
+          const p = players.get(pid);
+          if (!p || !p.active || p.health <= 0) continue;
+          const d = Math.hypot(p.x - ARENA_CENTER.x, p.y - ARENA_CENTER.y);
+          if (d <= radius) {
+            const maxHp = getMaxHealth(p.character);
+            if (p.health < maxHp) {
+              p.health = Math.min(maxHp, p.health + healAmt);
+              io.to(p.id).emit("heal_received", {
+                health: p.health,
+                amount: healAmt,
+                source: "granny_aura",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Placed Turrets automated firing
+    for (const obj of this.placedObjects) {
+      if (obj.type !== "turret" || obj.hp <= 0) continue;
+      const cooldown = Math.max(500, (obj.baseCooldown || 1600) * (this.turretCooldownMult || 1.0));
+      if (wallNow - (obj.lastShotAt || 0) >= cooldown && this.waveState === "active") {
+        const range = (obj.baseRange || 220) + (this.turretRangeBoost || 0);
+        let closestEnemy = null;
+        let closestDist = range;
+
+        for (const enemy of this.enemies) {
+          const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
+          if (d < closestDist) {
+            closestDist = d;
+            closestEnemy = enemy;
+          }
+        }
+
+        if (closestEnemy) {
+          obj.lastShotAt = wallNow;
+          const angle = Math.atan2(closestEnemy.y - obj.y, closestEnemy.x - obj.x);
+          obj.angle = angle;
+          const bulletDamage = (obj.baseDamage || 1.5) + (this.turretDamageBoost || 0);
+          bullets.push({
+            id: nextBulletId++,
+            room: this.room,
+            ownerId: "turret_" + obj.id,
+            x: obj.x + Math.cos(angle) * (obj.radius + 6),
+            y: obj.y + Math.sin(angle) * (obj.radius + 6),
+            vx: Math.cos(angle) * 540,
+            vy: Math.sin(angle) * 540,
+            damage: bulletDamage,
+            radius: 5,
+            character: "turret_plasma",
+            bornAt: wallNow,
+            expiresAt: wallNow + 1400,
+          });
+          io.to(this.room).emit("turret_fired", {
+            id: obj.id,
+            angle,
+            x: obj.x,
+            y: obj.y,
+          });
+        }
+      }
+    }
+
+    // 4. Placed Traps state cycling
+    for (const obj of this.placedObjects) {
+      if (obj.type !== "trap") continue;
+      if (obj.state === "frozen") {
+        if (wallNow >= obj.frozenUntil) {
+          obj.state = "recovery";
+          obj.recoveryUntil = wallNow + (this.trapRecoveryTime || 5000);
+          obj.frozenEnemyId = null;
+          io.to(this.room).emit("trap_state_changed", { id: obj.id, state: "recovery" });
+        }
+      } else if (obj.state === "recovery") {
+        if (wallNow >= obj.recoveryUntil) {
+          obj.state = "ready";
+          io.to(this.room).emit("trap_state_changed", { id: obj.id, state: "ready" });
+        }
+      }
+    }
+
+    // 5. Enemy Dodge AI
     for (const enemy of this.enemies) {
       if (!enemy.hasDodge || wallNow < enemy.dodgeReadyAt || wallNow < enemy.dodgeUntil) continue;
       for (const b of bullets) {
@@ -297,8 +715,39 @@ class HordeGame {
       }
     }
 
-    // Move enemies and melee attacks
-    for (const enemy of this.enemies) {
+    // 6. Move enemies and collisions
+    for (let ei = this.enemies.length - 1; ei >= 0; ei--) {
+      const enemy = this.enemies[ei];
+
+      // Frozen check
+      if (enemy.frozenUntil && enemy.frozenUntil > wallNow) {
+        continue;
+      }
+
+      // Check interaction with placed traps
+      for (const obj of this.placedObjects) {
+        if (obj.type === "trap" && obj.state === "ready") {
+          const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
+          if (d <= obj.radius + enemy.radius) {
+            obj.state = "frozen";
+            obj.frozenEnemyId = enemy.id;
+            obj.frozenUntil = wallNow + 5000;
+            enemy.frozenUntil = wallNow + 5000;
+            io.to(this.room).emit("trap_triggered", {
+              trapId: obj.id,
+              enemyId: enemy.id,
+              x: obj.x,
+              y: obj.y,
+            });
+            break;
+          }
+        }
+      }
+
+      if (enemy.frozenUntil && enemy.frozenUntil > wallNow) {
+        continue;
+      }
+
       if (wallNow < enemy.dodgeUntil) {
         enemy.x += enemy.dodgeVx * dt;
         enemy.y += enemy.dodgeVy * dt;
@@ -344,6 +793,43 @@ class HordeGame {
         enemy.recoilVy *= Math.pow(0.85, dt * 60);
       }
 
+      // Check collision with placed walls and turrets
+      for (let oi = this.placedObjects.length - 1; oi >= 0; oi--) {
+        const obj = this.placedObjects[oi];
+        if (obj.type === "wall" || obj.type === "turret") {
+          const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
+          const minD = enemy.radius + obj.radius;
+          if (d < minD) {
+            const pushX = (enemy.x - obj.x) / (d || 1);
+            const pushY = (enemy.y - obj.y) / (d || 1);
+            enemy.x = obj.x + pushX * minD;
+            enemy.y = obj.y + pushY * minD;
+
+            if (wallNow - enemy.lastAttackAt >= enemy.attackCooldown && this.waveState === "active") {
+              enemy.lastAttackAt = wallNow;
+              obj.hp -= enemy.damage;
+              io.to(this.room).emit("placed_object_hit", {
+                id: obj.id,
+                damage: enemy.damage,
+                hp: Math.max(0, obj.hp),
+                maxHp: obj.maxHp,
+                x: obj.x,
+                y: obj.y,
+              });
+              if (obj.hp <= 0) {
+                io.to(this.room).emit("placed_object_destroyed", {
+                  id: obj.id,
+                  type: obj.type,
+                  x: obj.x,
+                  y: obj.y,
+                });
+                this.placedObjects.splice(oi, 1);
+              }
+            }
+          }
+        }
+      }
+
       const clamped = clampToArena(enemy.x, enemy.y, enemy.radius);
       enemy.x = clamped.x;
       enemy.y = clamped.y;
@@ -370,12 +856,28 @@ class HordeGame {
         }
       }
 
-      // Melee damage to nearby players
+      // Melee damage to nearby players & Player Auto-Dodge
       for (const pid of roomPlayerIds) {
         const p = players.get(pid);
-        if (!p || !p.active || p.health <= 0 || p.protectedUntil > wallNow) continue;
+        if (!p || !p.active || p.health <= 0) continue;
         const pDist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
         const pRadius = characterRadius(p.character);
+
+        // Player Auto-Dodge check (Ability Card)
+        if (p.hasDodge && pDist <= enemy.radius + pRadius + 15 && wallNow >= (p.dodgeReadyAt || 0)) {
+          p.dodgeReadyAt = wallNow + 6000;
+          const pushX = (p.x - enemy.x) / (pDist || 1);
+          const pushY = (p.y - enemy.y) / (pDist || 1);
+          const targetPos = clampToArena(p.x + pushX * 130, p.y + pushY * 130, pRadius);
+          p.x = targetPos.x;
+          p.y = targetPos.y;
+          p.protectedUntil = wallNow + 350;
+          io.to(this.room).emit("player_dodged", { playerId: p.id, x: p.x, y: p.y });
+          continue;
+        }
+
+        if (p.protectedUntil > wallNow) continue;
+
         if (pDist <= enemy.radius + pRadius + 2) {
           if (wallNow - enemy.lastPlayerAttackAt >= enemy.attackCooldown) {
             enemy.lastPlayerAttackAt = wallNow;
@@ -398,36 +900,57 @@ class HordeGame {
       }
     }
 
+    // 7. Wave Cleared -> Trigger Upgrade Selection (Game Pauses!)
     if (this.waveState === "active") {
       if (this.enemiesSpawnedThisWave >= this.enemiesToSpawnThisWave && this.enemies.length === 0) {
-        this.waveState = "intermission";
-        this.intermissionUntil = wallNow + 5000;
+        this.waveState = "upgrade_selection";
         this.baseHealth = Math.min(this.maxBaseHealth, this.baseHealth + 25);
+
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
           if (p && p.active) {
-            p.health = Math.min(20, p.health + 10);
+            p.health = Math.min(getMaxHealth(p.character), p.health + 10);
             awardXp(p, 50 + this.wave * 15);
           }
         }
+
+        this.pendingPlayersToChoose = new Set();
+        this.cardOfferings.clear();
+
+        for (const pid of roomPlayerIds) {
+          const p = players.get(pid);
+          if (p && p.active) {
+            this.pendingPlayersToChoose.add(pid);
+            const cards = this.generateCardOptions(p);
+            this.cardOfferings.set(pid, cards);
+            io.to(pid).emit("horde_upgrade_options", {
+              wave: this.wave,
+              options: cards,
+              baseHealth: Math.round(this.baseHealth * 10) / 10,
+            });
+          }
+        }
+
         io.to(this.room).emit("wave_cleared", {
           wave: this.wave,
-          nextWaveIn: 5,
           baseHealth: Math.round(this.baseHealth * 10) / 10,
+          isUpgrading: true,
         });
-      }
-    } else if (this.waveState === "intermission") {
-      if (wallNow >= this.intermissionUntil) {
-        this.wave += 1;
-        this.waveState = "active";
-        this.enemiesSpawnedThisWave = 0;
-        this.enemiesToSpawnThisWave = 12 + this.wave * 5;
-        this.spawnInterval = Math.max(650, 1900 - this.wave * 100);
-        this.lastSpawnAt = wallNow + 1000;
-        io.to(this.room).emit("wave_started", {
-          wave: this.wave,
-          totalEnemies: this.enemiesToSpawnThisWave,
-        });
+
+        clearTimeout(this.upgradeTimeout);
+        this.upgradeTimeout = setTimeout(() => {
+          if (this.waveState === "upgrade_selection") {
+            for (const pid of this.pendingPlayersToChoose) {
+              const offerings = this.cardOfferings.get(pid);
+              if (offerings && offerings.length > 0) {
+                const p = players.get(pid);
+                if (p) this.applyCardUpgrade(p, offerings[0].id, io);
+              }
+            }
+            this.pendingPlayersToChoose.clear();
+            this.startNextWave(io, roomPlayerIds);
+          }
+        }, 30000);
       }
     } else if (this.waveState === "game_over") {
       if (wallNow >= this.intermissionUntil) {
@@ -436,13 +959,25 @@ class HordeGame {
         this.waveState = "active";
         this.enemies = [];
         this.enemiesSpawnedThisWave = 0;
-        this.enemiesToSpawnThisWave = 15;
-        this.spawnInterval = 1800;
+        this.enemiesToSpawnThisWave = this.getWaveEnemyCount(1, activePlayerCount);
+        this.spawnInterval = this.getSpawnInterval(1, activePlayerCount);
         this.lastSpawnAt = wallNow + 1200;
+        this.placedObjects = [];
+        this.grannyTurretLevel = 0;
+        this.healAuraLevel = 0;
+        this.turretRangeBoost = 0;
+        this.turretCooldownMult = 1.0;
+        this.turretDamageBoost = 0;
+        this.trapRecoveryTime = 5000;
+        clearTimeout(this.upgradeTimeout);
+        this.pendingPlayersToChoose.clear();
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
           if (p && p.active) {
             p.health = 20;
+            p.hasDash = false;
+            p.hasDodge = false;
+            p.pendingPlacements = [];
             p.x = ARENA_CENTER.x + (Math.random() - 0.5) * 180;
             p.y = ARENA_CENTER.y + (Math.random() - 0.5) * 180;
           }
@@ -1022,6 +1557,9 @@ io.on("connection", (socket) => {
     lastDamageAt: 0,
     soundwaveActive: false,
     soundwaveAngle: 0,
+    hasDash: currentMode !== "horde",
+    hasDodge: false,
+    pendingPlacements: [],
     lastSoundwavePulseAt: 0,
   };
   players.set(socket.id, p);
@@ -1101,6 +1639,9 @@ io.on("connection", (socket) => {
     if (validMode === "horde") {
       p.character = "scientist";
       p.health = 20;
+      p.hasDash = false;
+      p.hasDodge = false;
+      p.pendingPlacements = [];
       const spawn = getPlayerSpawn("scientist", newRoom);
       p.x = spawn.x;
       p.y = spawn.y;
@@ -1109,6 +1650,9 @@ io.on("connection", (socket) => {
     } else {
       p.character = p.lastFfaCharacter || "granny";
       p.health = getMaxHealth(p.character);
+      p.hasDash = true;
+      p.hasDodge = false;
+      p.pendingPlacements = [];
       const spawn = getPlayerSpawn(p.character, newRoom);
       p.x = spawn.x;
       p.y = spawn.y;
@@ -1129,6 +1673,60 @@ io.on("connection", (socket) => {
       if (scoreEntry) scoreEntry.name = cleanName;
     }
     socket.emit("name_updated", cleanName);
+  });
+  socket.on("choose_horde_upgrade", (payload) => {
+    if (p.mode !== "horde") return;
+    const horde = hordeGames.get(p.room);
+    if (!horde || horde.waveState !== "upgrade_selection") return;
+    const cardId = payload?.cardId;
+    if (!cardId) return;
+
+    horde.applyCardUpgrade(p, cardId, io);
+    horde.pendingPlayersToChoose.delete(socket.id);
+
+    if (horde.pendingPlayersToChoose.size === 0) {
+      clearTimeout(horde.upgradeTimeout);
+      horde.startNextWave(io, rooms.get(horde.room) || new Set());
+    }
+  });
+  socket.on("place_horde_object", (payload) => {
+    if (p.mode !== "horde") return;
+    const horde = hordeGames.get(p.room);
+    if (!horde) return;
+    const type = payload?.type;
+    const x = Number(payload?.x);
+    const y = Number(payload?.y);
+    if (!["wall", "turret", "trap"].includes(type)) return;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const distFromCenter = Math.hypot(x - ARENA_CENTER.x, y - ARENA_CENTER.y);
+    if (distFromCenter > ARENA_RADIUS - 50 || distFromCenter < 65) return;
+
+    const idx = (p.pendingPlacements || []).indexOf(type);
+    if (idx === -1) return;
+    p.pendingPlacements.splice(idx, 1);
+
+    const newObj = {
+      id: horde.nextObjectId++,
+      type,
+      ownerId: p.id,
+      x: Math.round(x),
+      y: Math.round(y),
+      radius: type === "wall" ? 26 : (type === "turret" ? 22 : 25),
+      hp: type === "wall" ? 35 : (type === "turret" ? 20 : 100),
+      maxHp: type === "wall" ? 35 : (type === "turret" ? 20 : 100),
+      angle: 0,
+      state: "ready",
+      lastShotAt: 0,
+      baseRange: 220,
+      baseCooldown: 1600,
+      baseDamage: 1.5,
+      frozenUntil: 0,
+      recoveryUntil: 0,
+    };
+    horde.placedObjects.push(newObj);
+    io.to(p.room).emit("horde_object_placed", { object: newObj });
+    socket.emit("exit_placement_mode");
   });
   socket.on("tom_aura", () => {
     const now = Date.now();
@@ -1249,6 +1847,7 @@ io.on("connection", (socket) => {
     if (
       !p.active ||
       p.health <= 0 ||
+      (p.mode === "horde" && !p.hasDash) ||
       now < p.dashReadyAt ||
       now < p.parryUntil
     )
@@ -1366,6 +1965,14 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     if (score.socketId === socket.id) score.socketId = null;
     players.delete(socket.id);
+    const horde = hordeGames.get(p.room);
+    if (horde && horde.waveState === "upgrade_selection") {
+      horde.pendingPlayersToChoose.delete(socket.id);
+      if (horde.pendingPlayersToChoose.size === 0) {
+        clearTimeout(horde.upgradeTimeout);
+        horde.startNextWave(io, rooms.get(horde.room) || new Set());
+      }
+    }
     const ids = rooms.get(p.room);
     ids?.delete(socket.id);
     if (ids?.size === 0) {
@@ -1875,6 +2482,11 @@ setInterval(() => {
               if (killer) {
                 killer.score.kills += 1;
                 awardXp(killer, enemy.xp);
+              } else {
+                for (const pid of roomPlayers) {
+                  const pl = players.get(pid);
+                  if (pl && pl.active) awardXp(pl, Math.max(1, Math.round(enemy.xp * 0.5)));
+                }
               }
               io.to(bullet.room).emit("enemy_killed", {
                 enemyId: enemy.id,
@@ -2142,6 +2754,8 @@ setInterval(() => {
         soundwaveAngle: p.soundwaveAngle || 0,
         xp: p.xp,
         level: p.level,
+        hasDash: p.hasDash === true,
+        hasDodge: p.hasDodge === true,
       }));
     const leaderboard = [...(roomScores.get(room)?.values() || [])]
       .filter((score) => score.socketId && players.has(score.socketId))
@@ -2165,6 +2779,22 @@ setInterval(() => {
       waveState: horde.waveState,
       enemiesRemaining: horde.enemies.length + (horde.enemiesToSpawnThisWave - horde.enemiesSpawnedThisWave),
       intermissionRemaining: Math.max(0, Math.ceil((horde.intermissionUntil - Date.now()) / 1000)),
+      grannyTurretLevel: horde.grannyTurretLevel || 0,
+      healAuraLevel: horde.healAuraLevel || 0,
+      healAuraRadius: horde.healAuraLevel > 0 ? (220 + horde.healAuraLevel * 20) : 0,
+      placedObjects: (horde.placedObjects || []).map((o) => ({
+        id: o.id,
+        type: o.type,
+        ownerId: o.ownerId,
+        x: o.x,
+        y: o.y,
+        radius: o.radius,
+        hp: Math.max(0, Math.round(o.hp * 10) / 10),
+        maxHp: o.maxHp,
+        angle: o.angle || 0,
+        state: o.state || "ready",
+        frozenEnemyId: o.frozenEnemyId || null,
+      })),
     } : { mode: "ffa" };
 
     io.to(room).volatile.emit("world", {
@@ -2189,6 +2819,7 @@ setInterval(() => {
         height: e.height,
         facing: e.facing,
         dodging: wallNow < e.dodgeUntil,
+        frozen: Boolean(e.frozenUntil && wallNow < e.frozenUntil),
       })) : [],
       objects: (roomObjects.get(room) || []).map((o) => ({
         id: o.id,
