@@ -22,9 +22,24 @@ const PORT = Number(process.env.PORT || 8080),
   DASH_COOLDOWN = 2500,
   DASH_DURATION = 220,
   DASH_PEAK_SPEED = 1250,
+  DODGE_COOLDOWN = 4000,
+  DODGE_DURATION = 240,
   PARRY_COOLDOWN = 4500,
   PARRY_DURATION = 700,
   PARRY_PADDING = 18;
+
+function getCapsuleClosestPoint(px, py, ox, oy, angle, halfLength) {
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  const dx = px - ox;
+  const dy = py - oy;
+  const proj = dx * cosA + dy * sinA;
+  const clampedProj = Math.max(-halfLength, Math.min(halfLength, proj));
+  return {
+    cx: ox + clampedProj * cosA,
+    cy: oy + clampedProj * sinA,
+  };
+}
 const CHARACTER_STATS = {
   granny: { width: 34, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
   cyborg: { width: 91, height: 108, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
@@ -207,8 +222,8 @@ const HORDE_CARDS = {
     id: "ability_dodge",
     category: "ability",
     rarity: "rare",
-    name: "Auto-Dodge Matrix",
-    desc: "Evasive cyber-roll automatically triggers when an enemy gets too close (6s cooldown).",
+    name: "Tactical Dodge",
+    desc: "Unlock manual Dodge roll with invulnerability frames (Shift / F) (4s cooldown).",
     icon: "🌀",
     faIcon: "fa-solid fa-wind",
     condition: (player, horde) => !player.hasDodge,
@@ -636,9 +651,9 @@ class HordeGame {
     // 3. Placed Turrets automated firing
     for (const obj of this.placedObjects) {
       if (obj.type !== "turret" || obj.hp <= 0) continue;
-      const cooldown = Math.max(500, (obj.baseCooldown || 1600) * (this.turretCooldownMult || 1.0));
+      const cooldown = Math.max(300, (obj.baseCooldown || 750) * (this.turretCooldownMult || 1.0));
       if (wallNow - (obj.lastShotAt || 0) >= cooldown && this.waveState === "active") {
-        const range = (obj.baseRange || 220) + (this.turretRangeBoost || 0);
+        const range = (obj.baseRange || 240) + (this.turretRangeBoost || 0);
         let closestEnemy = null;
         let closestDist = range;
 
@@ -654,15 +669,15 @@ class HordeGame {
           obj.lastShotAt = wallNow;
           const angle = Math.atan2(closestEnemy.y - obj.y, closestEnemy.x - obj.x);
           obj.angle = angle;
-          const bulletDamage = (obj.baseDamage || 1.5) + (this.turretDamageBoost || 0);
+          const bulletDamage = (obj.baseDamage || 2.2) + (this.turretDamageBoost || 0);
           bullets.push({
             id: nextBulletId++,
             room: this.room,
             ownerId: "turret_" + obj.id,
             x: obj.x + Math.cos(angle) * (obj.radius + 6),
             y: obj.y + Math.sin(angle) * (obj.radius + 6),
-            vx: Math.cos(angle) * 540,
-            vy: Math.sin(angle) * 540,
+            vx: Math.cos(angle) * 680,
+            vy: Math.sin(angle) * 680,
             damage: bulletDamage,
             radius: 5,
             character: "turret_plasma",
@@ -810,13 +825,21 @@ class HordeGame {
       for (let oi = this.placedObjects.length - 1; oi >= 0; oi--) {
         const obj = this.placedObjects[oi];
         if (obj.type === "wall" || obj.type === "turret") {
-          const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
-          const minD = enemy.radius + obj.radius;
+          let cx = obj.x;
+          let cy = obj.y;
+          let minD = enemy.radius + obj.radius;
+          if (obj.type === "wall") {
+            const pt = getCapsuleClosestPoint(enemy.x, enemy.y, obj.x, obj.y, obj.angle || 0, 62);
+            cx = pt.cx;
+            cy = pt.cy;
+            minD = enemy.radius + 18;
+          }
+          const d = Math.hypot(enemy.x - cx, enemy.y - cy);
           if (d < minD) {
-            const pushX = (enemy.x - obj.x) / (d || 1);
-            const pushY = (enemy.y - obj.y) / (d || 1);
-            enemy.x = obj.x + pushX * minD;
-            enemy.y = obj.y + pushY * minD;
+            const pushX = (enemy.x - cx) / (d || 1);
+            const pushY = (enemy.y - cy) / (d || 1);
+            enemy.x = cx + pushX * minD;
+            enemy.y = cy + pushY * minD;
 
             if (wallNow - enemy.lastAttackAt >= enemy.attackCooldown && this.waveState === "active") {
               enemy.lastAttackAt = wallNow;
@@ -869,25 +892,12 @@ class HordeGame {
         }
       }
 
-      // Melee damage to nearby players & Player Auto-Dodge
+      // Melee damage to nearby players (Manual Dodge only, never automatic)
       for (const pid of roomPlayerIds) {
         const p = players.get(pid);
         if (!p || !p.active || p.health <= 0) continue;
         const pDist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
         const pRadius = characterRadius(p.character);
-
-        // Player Auto-Dodge check (Ability Card)
-        if (p.hasDodge && pDist <= enemy.radius + pRadius + 15 && wallNow >= (p.dodgeReadyAt || 0)) {
-          p.dodgeReadyAt = wallNow + 6000;
-          const pushX = (p.x - enemy.x) / (pDist || 1);
-          const pushY = (p.y - enemy.y) / (pDist || 1);
-          const targetPos = clampToArena(p.x + pushX * 130, p.y + pushY * 130, pRadius);
-          p.x = targetPos.x;
-          p.y = targetPos.y;
-          p.protectedUntil = wallNow + 350;
-          io.to(this.room).emit("player_dodged", { playerId: p.id, x: p.x, y: p.y });
-          continue;
-        }
 
         if (p.protectedUntil > wallNow) continue;
 
@@ -1730,6 +1740,7 @@ io.on("connection", (socket) => {
     const type = payload?.type;
     const x = Number(payload?.x);
     const y = Number(payload?.y);
+    const angle = Number(payload?.angle) || 0;
     if (!["wall", "turret", "trap"].includes(type)) return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
@@ -1746,15 +1757,15 @@ io.on("connection", (socket) => {
       ownerId: p.id,
       x: Math.round(x),
       y: Math.round(y),
-      radius: type === "wall" ? 26 : (type === "turret" ? 22 : 25),
-      hp: type === "wall" ? 35 : (type === "turret" ? 20 : 100),
-      maxHp: type === "wall" ? 35 : (type === "turret" ? 20 : 100),
-      angle: 0,
+      radius: type === "wall" ? 30 : (type === "turret" ? 22 : 25),
+      hp: type === "wall" ? 60 : (type === "turret" ? 28 : 100),
+      maxHp: type === "wall" ? 60 : (type === "turret" ? 28 : 100),
+      angle: Number.isFinite(angle) ? angle : 0,
       state: "ready",
       lastShotAt: 0,
-      baseRange: 220,
-      baseCooldown: 1600,
-      baseDamage: 1.5,
+      baseRange: 240,
+      baseCooldown: 750,
+      baseDamage: 2.2,
       frozenUntil: 0,
       recoveryUntil: 0,
     };
@@ -1956,6 +1967,54 @@ io.on("connection", (socket) => {
       dashDirection: p.dashDirection,
     });
   });
+  socket.on("dodge", (payload) => {
+    const now = Date.now();
+    if (
+      !p.active ||
+      p.health <= 0 ||
+      (p.mode === "horde" && !p.hasDodge) ||
+      now < (p.dodgeReadyAt || 0) ||
+      now < p.parryUntil
+    ) {
+      return;
+    }
+
+    let dx = Number(payload?.x);
+    let dy = Number(payload?.y);
+    const length = Math.hypot(dx, dy);
+    if (Number.isFinite(dx) && Number.isFinite(dy) && length > 0.001) {
+      dx /= length;
+      dy /= length;
+    } else {
+      dx = Number(p.keys.right) - Number(p.keys.left);
+      dy = Number(p.keys.down) - Number(p.keys.up);
+      const kLen = Math.hypot(dx, dy);
+      if (kLen > 0.001) {
+        dx /= kLen;
+        dy /= kLen;
+      } else {
+        dx = p.facing.x;
+        dy = p.facing.y;
+      }
+    }
+    p.dodgeId = (p.dodgeId || 0) + 1;
+    p.dodgeStartedAt = now;
+    p.dodgeUntil = now + DODGE_DURATION;
+    p.dodgeReadyAt = now + DODGE_COOLDOWN;
+    p.dodgeDirection = { x: dx, y: dy };
+    p.facing = { x: dx, y: dy };
+    p.protectedUntil = Math.max(p.protectedUntil || 0, now + 350);
+    io.to(p.room).emit("player_dodged", {
+      playerId: p.id,
+      dodgeId: p.dodgeId,
+      dodgeStartedAt: p.dodgeStartedAt,
+      dodgeUntil: p.dodgeUntil,
+      dodgeReadyAt: p.dodgeReadyAt,
+      dodgeDirection: p.dodgeDirection,
+      x: p.x,
+      y: p.y,
+    });
+  });
   socket.on("shoot", (target) => {
     const now = Date.now();
     if (
@@ -2105,6 +2164,14 @@ setInterval(() => {
       speed = baseSpeed + (DASH_PEAK_SPEED - baseSpeed) * ease;
       dx = p.dashDirection.x;
       dy = p.dashDirection.y;
+    } else if (Date.now() < (p.dodgeUntil || 0)) {
+      const dodgeElapsed = DODGE_DURATION - (p.dodgeUntil - Date.now());
+      const dodgeProgress = clamp(dodgeElapsed / DODGE_DURATION, 0, 1);
+      const ease = Math.pow(1 - dodgeProgress, 1.4);
+      const baseSpeed = CHARACTER_STATS[p.character].speed;
+      speed = baseSpeed + (640 - baseSpeed) * ease;
+      dx = p.dodgeDirection.x;
+      dy = p.dodgeDirection.y;
     } else {
       dx = Number(p.keys.right) - Number(p.keys.left);
       dy = Number(p.keys.down) - Number(p.keys.up);
@@ -2172,6 +2239,8 @@ setInterval(() => {
         p.lastShotAt = 0;
         p.dashUntil = 0;
         p.dashReadyAt = 0;
+        p.dodgeUntil = 0;
+        p.dodgeReadyAt = 0;
         p.parryUntil = 0;
         p.parryReadyAt = 0;
       }
@@ -2885,6 +2954,11 @@ setInterval(() => {
         dashUntil: p.dashUntil,
         dashReadyAt: p.dashReadyAt,
         dashDirection: p.dashDirection,
+        dodgeId: p.dodgeId || 0,
+        dodgeStartedAt: p.dodgeStartedAt || 0,
+        dodgeUntil: p.dodgeUntil || 0,
+        dodgeReadyAt: p.dodgeReadyAt || 0,
+        dodgeDirection: p.dodgeDirection,
         lastInputSeq: p.lastInputSeq,
         health: Math.round(p.health * 10) / 10,
         maxHealth: getMaxHealth(p.character),
@@ -2927,6 +3001,10 @@ setInterval(() => {
       grannyTurretLevel: horde.grannyTurretLevel || 0,
       healAuraLevel: horde.healAuraLevel || 0,
       healAuraRadius: horde.healAuraLevel > 0 ? (220 + horde.healAuraLevel * 20) : 0,
+      turretRangeBoost: horde.turretRangeBoost || 0,
+      turretCooldownMult: horde.turretCooldownMult || 1.0,
+      turretDamageBoost: horde.turretDamageBoost || 0,
+      trapRecoveryTime: horde.trapRecoveryTime || 5000,
       placedObjects: (horde.placedObjects || []).map((o) => ({
         id: o.id,
         type: o.type,
@@ -2937,6 +3015,7 @@ setInterval(() => {
         hp: Math.max(0, Math.round(o.hp * 10) / 10),
         maxHp: o.maxHp,
         angle: o.angle || 0,
+        baseRange: o.baseRange || 240,
         state: o.state || "ready",
         frozenEnemyId: o.frozenEnemyId || null,
       })),
