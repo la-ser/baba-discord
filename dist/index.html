@@ -2021,12 +2021,183 @@
         box-shadow: 0 0 25px rgba(219, 39, 119, 0.5) !important;
         transition: transform 0.15s, box-shadow 0.15s !important;
       }
-      .btn-glow:hover {
-        transform: scale(1.02);
-        box-shadow: 0 0 35px rgba(219, 39, 119, 0.8) !important;
+      /* Mode Selector Dock */
+      .mode-select-dock {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        background: rgba(8, 12, 22, 0.7);
+        padding: 4px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        max-width: 360px;
+      }
+      .mode-tab-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        text-align: left;
+      }
+      .mode-tab-btn:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-primary);
+      }
+      .mode-tab-btn.active {
+        background: rgba(22, 32, 54, 0.95);
+        border-color: rgba(0, 229, 255, 0.35);
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      }
+      .mode-tab-btn[data-mode="horde"].active {
+        border-color: rgba(255, 190, 26, 0.55);
+        box-shadow: 0 4px 14px rgba(255, 190, 26, 0.15), inset 0 1px 0 rgba(255, 190, 26, 0.2);
+      }
+      .mode-tab-icon {
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .mode-tab-text {
+        display: flex;
+        flex-direction: column;
+      }
+      .mode-tab-text strong {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+      .mode-tab-text small {
+        font-size: 9.5px;
+        color: var(--text-muted);
+      }
+      .mode-tab-btn.active .mode-tab-text small {
+        color: var(--accent-cyan);
+      }
+      .mode-tab-btn[data-mode="horde"].active .mode-tab-text small {
+        color: var(--accent-gold);
+      }
+
+      /* Horde In-Game Top HUD */
+      #horde-hud {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 6px 18px;
+        background: rgba(6, 10, 18, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 190, 26, 0.45);
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 18px rgba(255, 190, 26, 0.15);
+        pointer-events: none;
+      }
+      .horde-base-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .base-icon {
+        font-size: 20px;
+        filter: drop-shadow(0 0 6px rgba(255, 190, 26, 0.5));
+      }
+      .base-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        width: 140px;
+      }
+      .base-header {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 800;
+        color: var(--text-secondary);
+      }
+      #horde-base-hp-text {
+        color: var(--accent-gold);
+        font-weight: 900;
+      }
+      .base-hp-bar {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      #horde-base-hp-fill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #00ff9d, #00e5ff);
+        transition: width 0.15s ease-out, background 0.3s;
+      }
+      .horde-wave-badge {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        border-left: 1px solid rgba(255, 255, 255, 0.12);
+        padding-left: 14px;
+        font-family: var(--font-mono);
+      }
+      .wave-title {
+        font-size: 13px;
+        font-weight: 900;
+        color: #ffffff;
+        letter-spacing: 0.05em;
+      }
+      .wave-sub {
+        font-size: 9px;
+        color: var(--accent-red);
+        font-weight: 800;
+      }
+
+      /* Horde Center Announcement */
+      #horde-announcement {
+        position: absolute;
+        top: 26%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 25;
+        text-align: center;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      #horde-announcement.hidden {
+        display: none !important;
+      }
+      #horde-announcement h2 {
+        font-size: clamp(34px, 5vw, 50px);
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin: 0;
+        color: #ffbe1a;
+        text-shadow: 0 0 25px rgba(255, 190, 26, 0.65), 0 2px 10px rgba(0,0,0,0.9);
+      }
+      #horde-announcement p {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: #e2e8f0;
+        margin: 6px 0 0;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-BtnoIyzE.js"></script>
+    <script type="module" crossorigin src="/assets/index-KvwUwNbr.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -2064,12 +2235,38 @@
 
         <!-- Top Center Scoreboard -->
         <div id="round-stats" class="hidden">
-          <span class="mode-tag">FFA</span>
+          <span class="mode-tag" id="hud-mode-tag">FFA</span>
           <div class="stat-item"><span class="stat-lbl">KILLS</span><strong id="kills-value">0</strong></div>
           <div class="stat-divider"></div>
           <div class="stat-item"><span class="stat-lbl">DEATHS</span><strong id="deaths-value">0</strong></div>
           <div class="stat-divider"></div>
           <div class="stat-item"><span class="stat-lbl">K/D</span><strong id="kd-value">0.0</strong></div>
+        </div>
+
+        <!-- Top Center Horde Status Bar -->
+        <div id="horde-hud" class="hidden">
+          <div class="horde-base-status">
+            <span class="base-icon">👵</span>
+            <div class="base-meta">
+              <div class="base-header">
+                <span class="base-label">GRANNY STATUE</span>
+                <span id="horde-base-hp-text">100 / 100 HP</span>
+              </div>
+              <div class="base-hp-bar">
+                <div id="horde-base-hp-fill" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="horde-wave-badge">
+            <span class="wave-title" id="horde-wave-num">WAVE 1</span>
+            <span class="wave-sub" id="horde-enemies-left">15 ENEMIES</span>
+          </div>
+        </div>
+
+        <!-- Horde Wave / Event Banner -->
+        <div id="horde-announcement" class="hidden">
+          <h2 id="horde-announce-title">WAVE 1</h2>
+          <p id="horde-announce-sub">DEFEND THE GRANNY STATUE</p>
         </div>
 
         <!-- Minimap (Top Left) -->
@@ -2202,9 +2399,27 @@
       <div class="menu-container">
         <div class="menu-branding">
           <div>
-            <div class="badge-tag">FFA Tactical Arena</div>
-            <h1 class="main-title">BABA <span>CYBORG</span></h1>
-            <p class="main-desc">High-octane arena combat. Dash into your line of fire, deflect projectile attacks, and dominate the server.</p>
+            <!-- Game Mode Tabs -->
+            <div class="mode-select-dock">
+              <button type="button" class="mode-tab-btn active" data-mode="ffa" id="tab-mode-ffa">
+                <span class="mode-tab-icon">⚔️</span>
+                <span class="mode-tab-text">
+                  <strong>FFA COMBAT</strong>
+                  <small>Free-For-All Arena</small>
+                </span>
+              </button>
+              <button type="button" class="mode-tab-btn" data-mode="horde" id="tab-mode-horde">
+                <span class="mode-tab-icon">🛡️</span>
+                <span class="mode-tab-text">
+                  <strong>HORDE MODE</strong>
+                  <small>Co-op Base Defense</small>
+                </span>
+              </button>
+            </div>
+
+            <div class="badge-tag" id="main-badge">FFA Tactical Arena</div>
+            <h1 class="main-title" id="main-title">BABA <span>CYBORG</span></h1>
+            <p class="main-desc" id="main-desc">High-octane arena combat. Dash into your line of fire, deflect projectile attacks, and dominate the server.</p>
           </div>
           <div class="menu-nav">
             <button id="play-button" class="btn btn-primary" disabled>Deploying…</button>

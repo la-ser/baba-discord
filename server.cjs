@@ -31,7 +31,435 @@ const CHARACTER_STATS = {
   mama_cyborg: { width: 91, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
   angry_granny: { width: 58, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
   sigmatom: { width: 186, height: 225, speed: 215, damage: 4.5, bulletRadius: 20, bulletSpeed: 1014, parryCooldown: 2250, maxHealth: 200 },
+  scientist: { width: 36, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
 };
+
+const ENEMY_CONFIG = {
+  cyborgian_1: {
+    type: "cyborgian_1",
+    name: "Scout",
+    texture: "cyborgian (1).png",
+    width: 48,
+    height: 77,
+    radius: 32,
+    speed: 215,
+    damage: 1.5,
+    maxHp: 6,
+    xp: 25,
+    hasDodge: true,
+    dodgeCooldown: 4000,
+    dodgeDistance: 110,
+  },
+  cyborgian_2: {
+    type: "cyborgian_2",
+    name: "Grunt",
+    texture: "cyborgian (2).png",
+    width: 56,
+    height: 90,
+    radius: 36,
+    speed: 155,
+    damage: 2.0,
+    maxHp: 12,
+    xp: 30,
+    hasDodge: false,
+  },
+  cyborgian_3: {
+    type: "cyborgian_3",
+    name: "Brawler",
+    texture: "cyborgian (3).png",
+    width: 66,
+    height: 106,
+    radius: 42,
+    speed: 130,
+    damage: 3.5,
+    maxHp: 20,
+    xp: 45,
+    hasDodge: false,
+  },
+  cyborgian_4: {
+    type: "cyborgian_4",
+    name: "Striker",
+    texture: "cyborgian (4).png",
+    width: 52,
+    height: 84,
+    radius: 34,
+    speed: 190,
+    damage: 2.2,
+    maxHp: 10,
+    xp: 35,
+    hasDodge: false,
+  },
+  cyborgian_5: {
+    type: "cyborgian_5",
+    name: "Phantom",
+    texture: "cyborgian (5).png",
+    width: 36,
+    height: 98,
+    radius: 32,
+    speed: 235,
+    damage: 2.1,
+    maxHp: 8,
+    xp: 40,
+    hasDodge: true,
+    dodgeCooldown: 3500,
+    dodgeDistance: 130,
+  },
+  cyborgian_6: {
+    type: "cyborgian_6",
+    name: "Berserker",
+    texture: "cyborgian (6).png",
+    width: 50,
+    height: 96,
+    radius: 35,
+    speed: 175,
+    damage: 3.0,
+    maxHp: 15,
+    xp: 35,
+    hasDodge: false,
+  },
+  cyborgian_8: {
+    type: "cyborgian_8",
+    name: "Stalker",
+    texture: "cyborgian (8).png",
+    width: 38,
+    height: 104,
+    radius: 34,
+    speed: 165,
+    damage: 2.6,
+    maxHp: 14,
+    xp: 35,
+    hasDodge: false,
+  },
+  cyborgian_9: {
+    type: "cyborgian_9",
+    name: "Goliath",
+    texture: "cyborgian (9).png",
+    width: 74,
+    height: 118,
+    radius: 46,
+    speed: 105,
+    damage: 5.0,
+    maxHp: 32,
+    xp: 70,
+    hasDodge: false,
+  },
+  cyborgian_10: {
+    type: "cyborgian_10",
+    name: "Vanguard",
+    texture: "cyborgian (10).png",
+    width: 60,
+    height: 96,
+    radius: 38,
+    speed: 140,
+    damage: 2.8,
+    maxHp: 18,
+    xp: 40,
+    hasDodge: false,
+  },
+  cyborgian_11: {
+    type: "cyborgian_11",
+    name: "Shadow",
+    texture: "cyborgian (11).png",
+    width: 54,
+    height: 87,
+    radius: 34,
+    speed: 205,
+    damage: 2.4,
+    maxHp: 11,
+    xp: 45,
+    hasDodge: true,
+    dodgeCooldown: 4500,
+    dodgeDistance: 120,
+  },
+};
+
+function sweptBulletTouchesCircle(bullet, prevX, prevY, cx, cy, cRadius) {
+  const bRadius = bullet.radius || BULLET_RADIUS;
+  const segX = bullet.x - prevX;
+  const segY = bullet.y - prevY;
+  const segLenSq = segX * segX + segY * segY;
+  const combinedR = cRadius + bRadius;
+  if (segLenSq === 0) {
+    return Math.hypot(bullet.x - cx, bullet.y - cy) <= combinedR;
+  }
+  const t = Math.max(0, Math.min(1, ((cx - prevX) * segX + (cy - prevY) * segY) / segLenSq));
+  const projX = prevX + segX * t;
+  const projY = prevY + segY * t;
+  return Math.hypot(projX - cx, projY - cy) <= combinedR;
+}
+
+const hordeGames = new Map();
+
+class HordeGame {
+  constructor(room) {
+    this.room = room;
+    this.baseHealth = 100;
+    this.maxBaseHealth = 100;
+    this.wave = 1;
+    this.waveState = "active";
+    this.intermissionUntil = 0;
+    this.enemies = [];
+    this.enemiesSpawnedThisWave = 0;
+    this.enemiesToSpawnThisWave = 14;
+    this.lastSpawnAt = Date.now() + 1000;
+    this.spawnInterval = 1750;
+    this.nextEnemyId = 1;
+    this.lastBaseDamageAt = 0;
+  }
+
+  getAvailableTypesForWave(wave) {
+    if (wave === 1) return ["cyborgian_1", "cyborgian_2", "cyborgian_4"];
+    if (wave === 2) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_6"];
+    if (wave === 3) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_5", "cyborgian_6", "cyborgian_8"];
+    if (wave === 4) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_5", "cyborgian_6", "cyborgian_8", "cyborgian_10", "cyborgian_11"];
+    return Object.keys(ENEMY_CONFIG);
+  }
+
+  spawnEnemy() {
+    const types = this.getAvailableTypesForWave(this.wave);
+    const chosenType = types[Math.floor(Math.random() * types.length)];
+    const config = ENEMY_CONFIG[chosenType];
+    const angle = Math.random() * Math.PI * 2;
+    const spawnDist = ARENA_RADIUS - 120 + (Math.random() - 0.5) * 80;
+    const x = ARENA_CENTER.x + Math.cos(angle) * spawnDist;
+    const y = ARENA_CENTER.y + Math.sin(angle) * spawnDist;
+
+    this.enemies.push({
+      id: this.nextEnemyId++,
+      type: chosenType,
+      name: config.name,
+      texture: config.texture,
+      width: config.width,
+      height: config.height,
+      radius: config.radius,
+      speed: config.speed,
+      damage: config.damage,
+      maxHp: config.maxHp,
+      hp: config.maxHp,
+      xp: config.xp,
+      hasDodge: config.hasDodge,
+      dodgeCooldown: config.dodgeCooldown || 4000,
+      dodgeDistance: config.dodgeDistance || 110,
+      dodgeReadyAt: 0,
+      dodgeUntil: 0,
+      dodgeVx: 0,
+      dodgeVy: 0,
+      x,
+      y,
+      facing: { x: -Math.cos(angle), y: -Math.sin(angle) },
+      lastAttackAt: 0,
+      lastPlayerAttackAt: 0,
+      attackCooldown: 900,
+      recoilVx: 0,
+      recoilVy: 0,
+    });
+  }
+
+  update(dt, wallNow, roomPlayerIds, bullets, io) {
+    if (this.waveState === "active") {
+      if (this.enemiesSpawnedThisWave < this.enemiesToSpawnThisWave) {
+        if (wallNow - this.lastSpawnAt >= this.spawnInterval) {
+          this.lastSpawnAt = wallNow;
+          this.enemiesSpawnedThisWave++;
+          this.spawnEnemy();
+        }
+      }
+    }
+
+    // Dodge trigger for rare evasive enemies
+    for (const enemy of this.enemies) {
+      if (!enemy.hasDodge || wallNow < enemy.dodgeReadyAt || wallNow < enemy.dodgeUntil) continue;
+      for (const b of bullets) {
+        if (b.room !== this.room) continue;
+        const bSpeed = Math.hypot(b.vx, b.vy);
+        if (bSpeed < 50) continue;
+        const toX = enemy.x - b.x;
+        const toY = enemy.y - b.y;
+        const dist = Math.hypot(toX, toY);
+        if (dist > 185 || dist < 20) continue;
+        const dot = (b.vx * toX + b.vy * toY) / (bSpeed * dist);
+        if (dot > 0.65) {
+          enemy.dodgeReadyAt = wallNow + enemy.dodgeCooldown;
+          enemy.dodgeUntil = wallNow + 220;
+          const perpX = -b.vy / bSpeed;
+          const perpY = b.vx / bSpeed;
+          const sign = Math.random() < 0.5 ? 1 : -1;
+          const dodgeSpeed = enemy.dodgeDistance / 0.22;
+          enemy.dodgeVx = sign * perpX * dodgeSpeed;
+          enemy.dodgeVy = sign * perpY * dodgeSpeed;
+          io.to(this.room).emit("enemy_dodged", {
+            enemyId: enemy.id,
+            x: enemy.x,
+            y: enemy.y,
+          });
+          break;
+        }
+      }
+    }
+
+    // Move enemies and melee attacks
+    for (const enemy of this.enemies) {
+      if (wallNow < enemy.dodgeUntil) {
+        enemy.x += enemy.dodgeVx * dt;
+        enemy.y += enemy.dodgeVy * dt;
+      } else {
+        let targetX = ARENA_CENTER.x;
+        let targetY = ARENA_CENTER.y;
+        let closestPlayer = null;
+        let closestPlayerDist = 160;
+
+        for (const pid of roomPlayerIds) {
+          const p = players.get(pid);
+          if (!p || !p.active || p.health <= 0) continue;
+          const d = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+          if (d < closestPlayerDist) {
+            closestPlayerDist = d;
+            closestPlayer = p;
+          }
+        }
+        if (closestPlayer) {
+          targetX = closestPlayer.x;
+          targetY = closestPlayer.y;
+        }
+
+        const dx = targetX - enemy.x;
+        const dy = targetY - enemy.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 5) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          enemy.facing = { x: nx, y: ny };
+          const minStopDist = closestPlayer ? (enemy.radius + characterRadius(closestPlayer.character) - 4) : (enemy.radius + 38);
+          if (dist > minStopDist) {
+            enemy.x += nx * enemy.speed * dt;
+            enemy.y += ny * enemy.speed * dt;
+          }
+        }
+      }
+
+      if (enemy.recoilVx || enemy.recoilVy) {
+        enemy.x += enemy.recoilVx * dt;
+        enemy.y += enemy.recoilVy * dt;
+        enemy.recoilVx *= Math.pow(0.85, dt * 60);
+        enemy.recoilVy *= Math.pow(0.85, dt * 60);
+      }
+
+      const clamped = clampToArena(enemy.x, enemy.y, enemy.radius);
+      enemy.x = clamped.x;
+      enemy.y = clamped.y;
+
+      // Melee damage to Granny Statue base
+      const distToCenter = Math.hypot(enemy.x - ARENA_CENTER.x, enemy.y - ARENA_CENTER.y);
+      if (distToCenter <= enemy.radius + 45) {
+        if (wallNow - enemy.lastAttackAt >= enemy.attackCooldown && this.waveState === "active") {
+          enemy.lastAttackAt = wallNow;
+          this.baseHealth = Math.max(0, this.baseHealth - enemy.damage);
+          this.lastBaseDamageAt = wallNow;
+          io.to(this.room).emit("base_hit", {
+            damage: enemy.damage,
+            baseHealth: Math.round(this.baseHealth * 10) / 10,
+            maxBaseHealth: this.maxBaseHealth,
+            x: enemy.x,
+            y: enemy.y,
+          });
+          if (this.baseHealth <= 0) {
+            this.waveState = "game_over";
+            this.intermissionUntil = wallNow + 6500;
+            io.to(this.room).emit("base_destroyed", { wave: this.wave });
+          }
+        }
+      }
+
+      // Melee damage to nearby players
+      for (const pid of roomPlayerIds) {
+        const p = players.get(pid);
+        if (!p || !p.active || p.health <= 0 || p.protectedUntil > wallNow) continue;
+        const pDist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+        const pRadius = characterRadius(p.character);
+        if (pDist <= enemy.radius + pRadius + 2) {
+          if (wallNow - enemy.lastPlayerAttackAt >= enemy.attackCooldown) {
+            enemy.lastPlayerAttackAt = wallNow;
+            p.health = Math.max(0, p.health - enemy.damage);
+            p.lastDamageAt = wallNow;
+            const pushX = (p.x - enemy.x) / (pDist || 1);
+            const pushY = (p.y - enemy.y) / (pDist || 1);
+            p.x += pushX * 24;
+            p.y += pushY * 24;
+            io.to(p.id).emit("damage_taken", {
+              health: p.health,
+              damage: enemy.damage,
+              attackerCharacter: "horde_melee",
+            });
+            if (p.health <= 0) {
+              killPlayer(p, null, "horde_melee");
+            }
+          }
+        }
+      }
+    }
+
+    if (this.waveState === "active") {
+      if (this.enemiesSpawnedThisWave >= this.enemiesToSpawnThisWave && this.enemies.length === 0) {
+        this.waveState = "intermission";
+        this.intermissionUntil = wallNow + 5000;
+        this.baseHealth = Math.min(this.maxBaseHealth, this.baseHealth + 25);
+        for (const pid of roomPlayerIds) {
+          const p = players.get(pid);
+          if (p && p.active) {
+            p.health = Math.min(20, p.health + 10);
+            awardXp(p, 50 + this.wave * 15);
+          }
+        }
+        io.to(this.room).emit("wave_cleared", {
+          wave: this.wave,
+          nextWaveIn: 5,
+          baseHealth: Math.round(this.baseHealth * 10) / 10,
+        });
+      }
+    } else if (this.waveState === "intermission") {
+      if (wallNow >= this.intermissionUntil) {
+        this.wave += 1;
+        this.waveState = "active";
+        this.enemiesSpawnedThisWave = 0;
+        this.enemiesToSpawnThisWave = 12 + this.wave * 5;
+        this.spawnInterval = Math.max(650, 1900 - this.wave * 100);
+        this.lastSpawnAt = wallNow + 1000;
+        io.to(this.room).emit("wave_started", {
+          wave: this.wave,
+          totalEnemies: this.enemiesToSpawnThisWave,
+        });
+      }
+    } else if (this.waveState === "game_over") {
+      if (wallNow >= this.intermissionUntil) {
+        this.wave = 1;
+        this.baseHealth = this.maxBaseHealth;
+        this.waveState = "active";
+        this.enemies = [];
+        this.enemiesSpawnedThisWave = 0;
+        this.enemiesToSpawnThisWave = 15;
+        this.spawnInterval = 1800;
+        this.lastSpawnAt = wallNow + 1200;
+        for (const pid of roomPlayerIds) {
+          const p = players.get(pid);
+          if (p && p.active) {
+            p.health = 20;
+            p.x = ARENA_CENTER.x + (Math.random() - 0.5) * 180;
+            p.y = ARENA_CENTER.y + (Math.random() - 0.5) * 180;
+          }
+        }
+        io.to(this.room).emit("horde_restarted", { wave: 1, baseHealth: this.baseHealth });
+      }
+    }
+  }
+}
+
+function initHordeGame(room) {
+  if (!hordeGames.has(room)) {
+    hordeGames.set(room, new HordeGame(room));
+  }
+  return hordeGames.get(room);
+}
+
 function getMaxHealth(character) {
   return CHARACTER_STATS[character]?.maxHealth || MAX_HEALTH;
 }
@@ -79,6 +507,10 @@ function createRandomObject(room, type = Math.random() < 0.5 ? "car1" : "car2") 
     const r = (0.15 + 0.85 * Math.sqrt(Math.random())) * maxSpawnDist;
     const testX = ARENA_CENTER.x + Math.cos(angle) * r;
     const testY = ARENA_CENTER.y + Math.sin(angle) * r;
+
+    if (room && room.endsWith(":horde") && Math.hypot(testX - ARENA_CENTER.x, testY - ARENA_CENTER.y) < 360) {
+      continue;
+    }
 
     let minClearance = Infinity;
 
@@ -226,6 +658,18 @@ const randomPosition = (character, room = null) => {
   return { x: bestX, y: bestY };
 };
 
+const getPlayerSpawn = (character, room = null) => {
+  if (room && room.endsWith(":horde")) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 50 + Math.random() * 140;
+    return {
+      x: ARENA_CENTER.x + Math.cos(angle) * dist,
+      y: ARENA_CENTER.y + Math.sin(angle) * dist,
+    };
+  }
+  return randomPosition(character, room);
+};
+
 function killPlayer(victim, killerId = null, attackerCharacter = "environment") {
   if (!victim || !victim.active || victim.health <= 0) return;
   victim.health = 0;
@@ -310,7 +754,7 @@ function killPlayer(victim, killerId = null, attackerCharacter = "environment") 
 
   setTimeout(() => {
     if (!players.has(victim.id)) return;
-    const nextSpawn = randomPosition(victim.character, victim.room);
+    const nextSpawn = getPlayerSpawn(victim.character, victim.room);
     victim.x = nextSpawn.x;
     victim.y = nextSpawn.y;
     victim.health = getMaxHealth(victim.character);
@@ -471,7 +915,8 @@ app.use(
 app.get("/health", (req, res) => res.json({ ok: true, players: players.size }));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 io.use(async (socket, next) => {
-  const { accessToken, instanceId, guestName } = socket.handshake.auth || {};
+  const { accessToken, instanceId, guestName, mode } = socket.handshake.auth || {};
+  const requestedMode = mode === "horde" ? "horde" : "ffa";
   if (accessToken === "dev-token" || !accessToken || accessToken.startsWith("guest-")) {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const validGuest = (typeof guestName === "string" && /^Guest\d{4}$/.test(guestName))
@@ -482,6 +927,7 @@ io.use(async (socket, next) => {
       name: validGuest,
       instanceId: instanceId || "browser-arena",
       isGuest: true,
+      mode: requestedMode,
     };
     return next();
   }
@@ -505,6 +951,7 @@ io.use(async (socket, next) => {
       id: user.id,
       name: String(user.global_name || user.username || "Player").slice(0, 24),
       instanceId,
+      mode: requestedMode,
     };
     next();
   } catch (e) {
@@ -512,10 +959,14 @@ io.use(async (socket, next) => {
   }
 });
 io.on("connection", (socket) => {
-  const { id: discordId, name, instanceId } = socket.data.identity;
-  const room = `activity:${instanceId}`;
+  const { id: discordId, name, instanceId, mode: initialMode } = socket.data.identity;
+  const currentMode = initialMode === "horde" ? "horde" : "ffa";
+  const room = `activity:${instanceId}:${currentMode}`;
   socket.join(room);
   initRoomObjects(room);
+  if (currentMode === "horde") {
+    initHordeGame(room);
+  }
   if (!roomScores.has(room)) roomScores.set(room, new Map());
   const scores = roomScores.get(room);
   const score = scores.get(discordId) || {
@@ -528,7 +979,9 @@ io.on("connection", (socket) => {
   score.name = name;
   score.socketId = socket.id;
   scores.set(discordId, score);
-  const spawn = randomPosition("granny", room);
+  const isHorde = currentMode === "horde";
+  const defaultChar = isHorde ? "scientist" : "granny";
+  const spawn = getPlayerSpawn(defaultChar, room);
   const p = {
     id: socket.id,
     discordId,
@@ -536,7 +989,9 @@ io.on("connection", (socket) => {
     x: spawn.x,
     y: spawn.y,
     color: `hsl(${Math.floor(Math.random() * 360)} 75% 65%)`,
-    character: "granny",
+    character: defaultChar,
+    mode: currentMode,
+    lastFfaCharacter: "granny",
     keys: { up: false, down: false, left: false, right: false },
     facing: { x: 1, y: 0 },
     parryId: 0,
@@ -552,7 +1007,7 @@ io.on("connection", (socket) => {
     dashReadyAt: 0,
     dashDirection: { x: 1, y: 0 },
     lastShotAt: 0,
-    health: getMaxHealth("granny"),
+    health: getMaxHealth(defaultChar),
     score,
     minigun: false,
     active: false,
@@ -578,6 +1033,8 @@ io.on("connection", (socket) => {
     level: p.level,
     name: p.name,
     discordId: p.discordId,
+    mode: p.mode,
+    character: p.character,
   });
   socket.on("time_sync", (acknowledge) => {
     if (typeof acknowledge === "function") acknowledge(Date.now());
@@ -591,10 +1048,12 @@ io.on("connection", (socket) => {
       p.lastInputSeq = Math.max(p.lastInputSeq, payload.sequence);
   });
   socket.on("character", (character) => {
+    if (p.mode === "horde") return;
     if (!p.active) {
       if ((character === "mama_cyborg" || character === "angry_granny") && p.level < 10 && p.xp < 1000) return;
       if (character === "granny" || character === "cyborg" || character === "mama_cyborg" || character === "angry_granny") {
         p.character = character;
+        p.lastFfaCharacter = character;
         p.health = getMaxHealth(character);
         const radius = characterRadius(character);
         p.x = clamp(p.x, radius, WIDTH - radius);
@@ -603,26 +1062,62 @@ io.on("connection", (socket) => {
     }
   });
   socket.on("switch_character", (character) => {
+    if (p.mode === "horde") return;
     const validCharacters = ["granny", "cyborg", "mama_cyborg", "angry_granny", "sigmatom"];
     if (!validCharacters.includes(character)) return;
     if ((character === "mama_cyborg" || character === "angry_granny") && (p.level < 10 && p.xp < 1000)) return;
     p.character = character;
+    p.lastFfaCharacter = character;
     p.health = getMaxHealth(character);
     p.soundwaveActive = false;
     const radius = characterRadius(character);
     p.x = clamp(p.x, radius, WIDTH - radius);
     p.y = clamp(p.y, radius, HEIGHT - radius);
-    io.to(room).emit("character_switched", {
+    io.to(p.room).emit("character_switched", {
       playerId: p.id,
       character: p.character,
     });
+  });
+  socket.on("switch_mode", (targetMode) => {
+    const validMode = targetMode === "horde" ? "horde" : "ffa";
+    if (p.mode === validMode) return;
+    const oldRoom = p.room;
+    socket.leave(oldRoom);
+    rooms.get(oldRoom)?.delete(socket.id);
+
+    p.mode = validMode;
+    const newRoom = `activity:${instanceId}:${validMode}`;
+    p.room = newRoom;
+    socket.join(newRoom);
+    if (!rooms.has(newRoom)) rooms.set(newRoom, new Set());
+    rooms.get(newRoom).add(socket.id);
+
+    if (validMode === "horde") {
+      p.character = "scientist";
+      p.health = 20;
+      const spawn = getPlayerSpawn("scientist", newRoom);
+      p.x = spawn.x;
+      p.y = spawn.y;
+      initHordeGame(newRoom);
+      initRoomObjects(newRoom);
+    } else {
+      p.character = p.lastFfaCharacter || "granny";
+      p.health = getMaxHealth(p.character);
+      const spawn = getPlayerSpawn(p.character, newRoom);
+      p.x = spawn.x;
+      p.y = spawn.y;
+      initRoomObjects(newRoom);
+    }
+    p.deadSince = 0;
+    p.protectedUntil = Date.now() + SPAWN_PROTECTION;
+    socket.emit("mode_switched", { mode: validMode, character: p.character });
   });
   socket.on("tom_aura", () => {
     const now = Date.now();
     if (!p.active || p.health <= 0 || p.character !== "sigmatom") return;
     if (p.lastTomAuraAt && now - p.lastTomAuraAt < 1200) return;
     p.lastTomAuraAt = now;
-    io.to(room).emit("tom_aura_played", {
+    io.to(p.room).emit("tom_aura_played", {
       playerId: p.id,
       x: p.x,
       y: p.y,
@@ -634,7 +1129,7 @@ io.on("connection", (socket) => {
     p.soundwaveActive = true;
     p.soundwaveAngle = Number(payload?.angle) || Math.atan2(p.facing.y, p.facing.x);
     p.lastSoundwavePulseAt = Date.now();
-    io.to(room).emit("soundwave_started", {
+    io.to(p.room).emit("soundwave_started", {
       playerId: p.id,
       angle: p.soundwaveAngle,
     });
@@ -642,7 +1137,7 @@ io.on("connection", (socket) => {
   socket.on("soundwave_aim", (payload) => {
     if (!p.active || p.health <= 0 || p.character !== "sigmatom" || !p.soundwaveActive) return;
     p.soundwaveAngle = Number(payload?.angle) || 0;
-    io.to(room).emit("soundwave_aimed", {
+    io.to(p.room).emit("soundwave_aimed", {
       playerId: p.id,
       angle: p.soundwaveAngle,
     });
@@ -650,14 +1145,14 @@ io.on("connection", (socket) => {
   socket.on("soundwave_stop", () => {
     if (!p.soundwaveActive) return;
     p.soundwaveActive = false;
-    io.to(room).emit("soundwave_stopped", {
+    io.to(p.room).emit("soundwave_stopped", {
       playerId: p.id,
     });
   });
   socket.on("active", (active) => {
     const nextActive = active === true;
     if (nextActive && (!p.active || p.health <= 0)) {
-      const nextSpawn = randomPosition(p.character, p.room);
+      const nextSpawn = getPlayerSpawn(p.character, p.room);
       p.x = nextSpawn.x;
       p.y = nextSpawn.y;
       p.health = getMaxHealth(p.character);
@@ -688,7 +1183,7 @@ io.on("connection", (socket) => {
   socket.on("respawn", () => {
     if (!p.active) p.active = true;
     if (p.health <= 0) {
-      const nextSpawn = randomPosition(p.character, p.room);
+      const nextSpawn = getPlayerSpawn(p.character, p.room);
       p.x = nextSpawn.x;
       p.y = nextSpawn.y;
       p.health = getMaxHealth(p.character);
@@ -723,7 +1218,7 @@ io.on("connection", (socket) => {
     p.parryStartedAt = now;
     p.parryUntil = now + PARRY_DURATION;
     p.parryReadyAt = now + parryCooldown;
-    io.to(room).emit("parry_started", {
+    io.to(p.room).emit("parry_started", {
       playerId: p.id,
       parryId: p.parryId,
       parryStartedAt: p.parryStartedAt,
@@ -766,7 +1261,7 @@ io.on("connection", (socket) => {
     p.dashReadyAt = now + DASH_COOLDOWN;
     p.dashDirection = { x: dx, y: dy };
     p.facing = { x: dx, y: dy };
-    io.to(room).emit("dash_started", {
+    io.to(p.room).emit("dash_started", {
       playerId: p.id,
       dashId: p.dashId,
       dashStartedAt: p.dashStartedAt,
@@ -817,7 +1312,7 @@ io.on("connection", (socket) => {
           createdAt: now,
           expiresAt: now + 3000,
         });
-        io.to(room).emit("hook_fired", {
+        io.to(p.room).emit("hook_fired", {
           playerId: p.id,
           x: p.x,
           y: p.y,
@@ -836,7 +1331,7 @@ io.on("connection", (socket) => {
     bullets.push({
       id: nextBulletId++,
       ownerId: p.id,
-      room,
+      room: p.room,
       x: p.x + direction.x * muzzleDistance,
       y: p.y + direction.y * muzzleDistance,
       vx: direction.x * bSpeed,
@@ -853,14 +1348,17 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     if (score.socketId === socket.id) score.socketId = null;
     players.delete(socket.id);
-    const ids = rooms.get(room);
+    const ids = rooms.get(p.room);
     ids?.delete(socket.id);
     if (ids?.size === 0) {
-      rooms.delete(room);
-      roomScores.delete(room);
-      roomObjects.delete(room);
+      rooms.delete(p.room);
+      roomScores.delete(p.room);
+      roomObjects.delete(p.room);
+      if (p.room.endsWith(":horde")) {
+        hordeGames.delete(p.room);
+      }
       for (let i = bullets.length - 1; i >= 0; i--)
-        if (bullets[i].room === room) bullets.splice(i, 1);
+        if (bullets[i].room === p.room) bullets.splice(i, 1);
     }
   });
 });
@@ -950,12 +1448,18 @@ setInterval(() => {
 
   const wallNow = Date.now();
 
+  // Update Horde Game Waves & Enemies
+  for (const horde of hordeGames.values()) {
+    const roomPlayerIds = rooms.get(horde.room) || new Set();
+    horde.update(dt, wallNow, roomPlayerIds, bullets, io);
+  }
+
   // Dead Player Watchdog: Ensure no player stays stuck dead under any condition
   for (const p of players.values()) {
     if (p.active && p.health <= 0) {
       if (!p.deadSince) p.deadSince = wallNow;
       if (wallNow - p.deadSince > 1300) {
-        const nextSpawn = randomPosition(p.character, p.room);
+        const nextSpawn = getPlayerSpawn(p.character, p.room);
         p.x = nextSpawn.x;
         p.y = nextSpawn.y;
         p.health = getMaxHealth(p.character);
@@ -1319,6 +1823,57 @@ setInterval(() => {
       if (hitObj) continue;
     }
 
+    const isHordeRoom = bullet.room.endsWith(":horde");
+    if (isHordeRoom) {
+      const horde = hordeGames.get(bullet.room);
+      if (horde) {
+        let hitEnemy = false;
+        for (let ei = horde.enemies.length - 1; ei >= 0; ei--) {
+          const enemy = horde.enemies[ei];
+          if (sweptBulletTouchesCircle(bullet, previousX, previousY, enemy.x, enemy.y, enemy.radius)) {
+            enemy.hp -= bullet.damage;
+            const bSpeed = Math.hypot(bullet.vx, bullet.vy) || 1;
+            enemy.recoilVx += (bullet.vx / bSpeed) * 140;
+            enemy.recoilVy += (bullet.vy / bSpeed) * 140;
+            const isKill = enemy.hp <= 0;
+            io.to(bullet.ownerId).emit("hit_marker", {
+              targetId: "enemy_" + enemy.id,
+              damage: bullet.damage,
+              kill: isKill,
+            });
+            io.to(bullet.room).emit("enemy_hit", {
+              enemyId: enemy.id,
+              damage: bullet.damage,
+              hp: Math.max(0, enemy.hp),
+              maxHp: enemy.maxHp,
+              x: bullet.x,
+              y: bullet.y,
+            });
+            if (isKill) {
+              const killer = players.get(bullet.ownerId);
+              if (killer) {
+                killer.score.kills += 1;
+                awardXp(killer, enemy.xp);
+              }
+              io.to(bullet.room).emit("enemy_killed", {
+                enemyId: enemy.id,
+                type: enemy.type,
+                x: enemy.x,
+                y: enemy.y,
+                killerId: bullet.ownerId,
+                xp: enemy.xp,
+              });
+              horde.enemies.splice(ei, 1);
+            }
+            bullets.splice(i, 1);
+            hitEnemy = true;
+            break;
+          }
+        }
+        if (hitEnemy) continue;
+      }
+    }
+
     let deflected = false;
     for (const playerId of roomPlayers) {
       const defender = players.get(playerId);
@@ -1366,6 +1921,9 @@ setInterval(() => {
       break;
     }
     if (deflected) continue;
+
+    // Friendly fire disabled in Horde Mode:
+    if (isHordeRoom) continue;
     const hit = [...roomPlayers]
       .map((id) => players.get(id))
       .find((target) => {
@@ -1576,6 +2134,18 @@ setInterval(() => {
       .sort((a, b) =>
         b.kills - a.kills || a.deaths - b.deaths || a.name.localeCompare(b.name),
       );
+    const isHordeRoom = room.endsWith(":horde");
+    const horde = isHordeRoom ? hordeGames.get(room) : null;
+    const hordePayload = horde ? {
+      mode: "horde",
+      baseHealth: Math.round(horde.baseHealth * 10) / 10,
+      maxBaseHealth: horde.maxBaseHealth,
+      wave: horde.wave,
+      waveState: horde.waveState,
+      enemiesRemaining: horde.enemies.length + (horde.enemiesToSpawnThisWave - horde.enemiesSpawnedThisWave),
+      intermissionRemaining: Math.max(0, Math.ceil((horde.intermissionUntil - Date.now()) / 1000)),
+    } : { mode: "ffa" };
+
     io.to(room).volatile.emit("world", {
       sequence: worldSequence,
       serverTime: snapshotTime,
@@ -1583,6 +2153,22 @@ setInterval(() => {
         leaderboard.find((entry) => entry.active && entry.kills > 0)?.id || null,
       leaderboard,
       players: state,
+      horde: hordePayload,
+      enemies: horde ? horde.enemies.map((e) => ({
+        id: e.id,
+        type: e.type,
+        name: e.name,
+        texture: e.texture,
+        x: Math.round(e.x * 10) / 10,
+        y: Math.round(e.y * 10) / 10,
+        hp: Math.round(e.hp * 10) / 10,
+        maxHp: e.maxHp,
+        radius: e.radius,
+        width: e.width,
+        height: e.height,
+        facing: e.facing,
+        dodging: wallNow < e.dodgeUntil,
+      })) : [],
       objects: (roomObjects.get(room) || []).map((o) => ({
         id: o.id,
         type: o.type,
