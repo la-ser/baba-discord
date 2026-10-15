@@ -1071,7 +1071,8 @@ io.on("connection", (socket) => {
     if ((character === "mama_cyborg" || character === "angry_granny") && (p.level < 10 && p.xp < 1000)) return;
     p.character = character;
     p.lastFfaCharacter = character;
-    p.health = getMaxHealth(character);
+    const maxHp = getMaxHealth(character);
+    p.health = maxHp;
     p.soundwaveActive = false;
     const radius = characterRadius(character);
     p.x = clamp(p.x, radius, WIDTH - radius);
@@ -1079,6 +1080,8 @@ io.on("connection", (socket) => {
     io.to(p.room).emit("character_switched", {
       playerId: p.id,
       character: p.character,
+      health: p.health,
+      maxHealth: maxHp,
     });
   });
   socket.on("switch_mode", (targetMode) => {
@@ -1393,11 +1396,14 @@ function awardXp(player, amount) {
   });
 
   if (newLevel > oldLevel) {
-    player.health = MAX_HEALTH;
+    const maxHp = getMaxHealth(player.character);
+    player.health = maxHp;
     io.to(player.room).emit("player_leveled_up", {
       playerId: player.id,
       name: player.name,
       level: newLevel,
+      health: player.health,
+      maxHealth: maxHp,
       unlockedMamaCyborg: newLevel >= 10,
     });
   }

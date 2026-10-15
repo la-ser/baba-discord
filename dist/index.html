@@ -760,6 +760,9 @@
         transition: width 0.12s ease-out, background 0.25s;
       }
       .health-readout {
+        display: inline-flex;
+        align-items: baseline;
+        justify-content: flex-end;
         font-family: var(--font-mono);
         font-size: 13px;
         font-weight: 900;
@@ -771,6 +774,12 @@
         font-size: 9px;
         color: var(--text-muted);
         margin-left: 2px;
+      }
+      .health-hp-sub {
+        font-size: 10px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.45);
+        margin-left: 5px;
       }
       #protection {
         display: inline-flex;
@@ -2395,7 +2404,7 @@
         text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-B795NukG.js"></script>
+    <script type="module" crossorigin src="/assets/index-CIU-OpE0.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -2416,7 +2425,7 @@
               <div class="health-bar">
                 <div id="health-fill"></div>
               </div>
-              <div class="health-readout"><span id="health-value">100</span><span class="health-unit">%</span></div>
+              <div class="health-readout"><span id="health-value">100</span><span class="health-unit">%</span> <span id="health-hp-sub" class="health-hp-sub">(20/20 HP)</span></div>
             </div>
             <div id="protection" class="hidden">Spawn Shield Active</div>
             <div class="xp-container">
