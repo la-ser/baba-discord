@@ -9,7 +9,9 @@ const app = express(),
   io = new Server(server);
 const PORT = Number(process.env.PORT || 8080),
   WIDTH = 3600,
-  HEIGHT = 2025,
+  HEIGHT = 3600,
+  ARENA_CENTER = { x: 1800, y: 1800 },
+  ARENA_RADIUS = 1650,
   BULLET_SPEED = 520,
   BULLET_RADIUS = 5,
   BULLET_LIFETIME = 1800,
@@ -33,6 +35,24 @@ const CHARACTER_STATS = {
 function getMaxHealth(character) {
   return CHARACTER_STATS[character]?.maxHealth || MAX_HEALTH;
 }
+
+function clampToArena(x, y, radius = 0) {
+  const dx = x - ARENA_CENTER.x;
+  const dy = y - ARENA_CENTER.y;
+  const dist = Math.hypot(dx, dy);
+  const maxDist = Math.max(0, ARENA_RADIUS - radius);
+  if (dist > maxDist && dist > 0.001) {
+    return {
+      x: ARENA_CENTER.x + (dx / dist) * maxDist,
+      y: ARENA_CENTER.y + (dy / dist) * maxDist,
+      clamped: true,
+      nx: dx / dist,
+      ny: dy / dist,
+    };
+  }
+  return { x, y, clamped: false, nx: 0, ny: 0 };
+}
+
 const OBJECT_CONFIG = {
   car1: { width: 52, height: 52, radius: 25, maxHp: 3, xp: 20, contactDamage: 0.8 },
   car2: { width: 66, height: 40, radius: 28, maxHp: 5, xp: 35, contactDamage: 1.2 },
@@ -40,16 +60,61 @@ const OBJECT_CONFIG = {
 const OBJECT_COUNT = 35;
 const roomObjects = new Map();
 let nextObjectId = 1;
+const grapplerHooks = [];
+let nextHookId = 1;
 
 function createRandomObject(room, type = Math.random() < 0.5 ? "car1" : "car2") {
   const config = OBJECT_CONFIG[type];
   const radius = config.radius;
+  const maxSpawnDist = ARENA_RADIUS - radius - 120;
+  const objs = roomObjects.get(room) || [];
+  const roomPlayerIds = rooms.get(room) || new Set();
+
+  let bestX = ARENA_CENTER.x + (Math.random() - 0.5) * 400;
+  let bestY = ARENA_CENTER.y + (Math.random() - 0.5) * 400;
+  let maxMinClearance = -Infinity;
+
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = (0.15 + 0.85 * Math.sqrt(Math.random())) * maxSpawnDist;
+    const testX = ARENA_CENTER.x + Math.cos(angle) * r;
+    const testY = ARENA_CENTER.y + Math.sin(angle) * r;
+
+    let minClearance = Infinity;
+
+    for (const other of objs) {
+      const d = Math.hypot(testX - other.x, testY - other.y) - (radius + other.radius);
+      if (d < minClearance) minClearance = d;
+    }
+
+    for (const pid of roomPlayerIds) {
+      const p = players.get(pid);
+      if (p) {
+        const pRad = characterRadius(p.character);
+        const d = Math.hypot(testX - p.x, testY - p.y) - (radius + pRad);
+        if (d < minClearance) minClearance = d;
+      }
+    }
+
+    if (minClearance > 120) {
+      bestX = testX;
+      bestY = testY;
+      break;
+    }
+
+    if (minClearance > maxMinClearance) {
+      maxMinClearance = minClearance;
+      bestX = testX;
+      bestY = testY;
+    }
+  }
+
   return {
     id: nextObjectId++,
     room,
     type,
-    x: radius + 60 + Math.random() * (WIDTH - radius * 2 - 120),
-    y: radius + 60 + Math.random() * (HEIGHT - radius * 2 - 120),
+    x: bestX,
+    y: bestY,
     vx: (Math.random() - 0.5) * 45,
     vy: (Math.random() - 0.5) * 45,
     angle: Math.random() * Math.PI * 2,
@@ -116,13 +181,146 @@ const characterRadius = (character) => {
   const dimensions = characterDimensions(character);
   return Math.hypot(dimensions.width, dimensions.height) / 2;
 };
-const randomPosition = (character) => {
-  const radius = characterRadius(character);
-  return {
-    x: radius + Math.random() * (WIDTH - radius * 2),
-    y: radius + Math.random() * (HEIGHT - radius * 2),
-  };
+const randomPosition = (character, room = null) => {
+  const pRadius = characterRadius(character);
+  const maxSpawnDist = ARENA_RADIUS - pRadius - 100;
+  const objs = room ? (roomObjects.get(room) || []) : [];
+  const roomPlayerIds = room ? (rooms.get(room) || new Set()) : new Set();
+
+  let bestX = ARENA_CENTER.x + (Math.random() - 0.5) * 300;
+  let bestY = ARENA_CENTER.y + (Math.random() - 0.5) * 300;
+  let maxMinClearance = -Infinity;
+
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = (0.1 + 0.9 * Math.sqrt(Math.random())) * maxSpawnDist;
+    const testX = ARENA_CENTER.x + Math.cos(angle) * r;
+    const testY = ARENA_CENTER.y + Math.sin(angle) * r;
+
+    let minClearance = Infinity;
+
+    for (const obj of objs) {
+      const d = Math.hypot(testX - obj.x, testY - obj.y) - (pRadius + obj.radius);
+      if (d < minClearance) minClearance = d;
+    }
+
+    for (const pid of roomPlayerIds) {
+      const other = players.get(pid);
+      if (other) {
+        const d = Math.hypot(testX - other.x, testY - other.y) - (pRadius + characterRadius(other.character));
+        if (d < minClearance) minClearance = d;
+      }
+    }
+
+    if (minClearance > 140) {
+      return { x: testX, y: testY };
+    }
+
+    if (minClearance > maxMinClearance) {
+      maxMinClearance = minClearance;
+      bestX = testX;
+      bestY = testY;
+    }
+  }
+
+  return { x: bestX, y: bestY };
 };
+
+function killPlayer(victim, killerId = null, attackerCharacter = "environment") {
+  if (!victim || !victim.active || victim.health <= 0) return;
+  victim.health = 0;
+  victim.deadSince = Date.now();
+  victim.score.deaths += 1;
+  victim.soundwaveActive = false;
+
+  // Clean up any grappler hooks involving this victim
+  for (let hi = grapplerHooks.length - 1; hi >= 0; hi--) {
+    if (grapplerHooks[hi].ownerId === victim.id || grapplerHooks[hi].targetId === victim.id) {
+      grapplerHooks.splice(hi, 1);
+    }
+  }
+
+  let attacker = killerId ? players.get(killerId) : null;
+  if (attacker && attacker.room === victim.room) {
+    attacker.score.kills += 1;
+    awardXp(attacker, 50); // Elimination bonus
+    io.to(victim.room).emit("player_kill", {
+      killerId: attacker.id,
+      killerName: attacker.name,
+      killerCharacter: attacker.character,
+      killerLevel: attacker.level || 1,
+      victimId: victim.id,
+      victimName: victim.name,
+      victimCharacter: victim.character,
+      victimLevel: victim.level || 1,
+      weapon: attackerCharacter,
+    });
+  } else {
+    io.to(victim.room).emit("player_kill", {
+      killerId: null,
+      killerName: attackerCharacter === "car" ? "Obstacle" : "The Void",
+      killerCharacter: attackerCharacter,
+      killerLevel: 1,
+      victimId: victim.id,
+      victimName: victim.name,
+      victimCharacter: victim.character,
+      victimLevel: victim.level || 1,
+      weapon: attackerCharacter,
+    });
+  }
+
+  // In Diep.io, dying halves XP / level
+  victim.xp = Math.floor((victim.xp || 0) * 0.5);
+  victim.level = getLevelForXp(victim.xp);
+
+  let demoted = false;
+  if (victim.character === "mama_cyborg" && victim.level < 10) {
+    victim.character = "cyborg";
+    demoted = true;
+    io.to(victim.room).emit("character_switched", {
+      playerId: victim.id,
+      character: "cyborg",
+    });
+  } else if (victim.character === "angry_granny" && victim.level < 10) {
+    victim.character = "granny";
+    demoted = true;
+    io.to(victim.room).emit("character_switched", {
+      playerId: victim.id,
+      character: "granny",
+    });
+  }
+
+  io.to(victim.id).emit("xp_update", {
+    xp: victim.xp,
+    level: victim.level,
+    lost: true,
+    demoted,
+    nextLevelXp: getXpForNextLevel(victim.level),
+  });
+
+  io.to(victim.id).emit("jumpscare", {
+    health: 0,
+    damage: 100,
+    attackerCharacter,
+  });
+
+  setTimeout(() => {
+    if (!players.has(victim.id)) return;
+    const nextSpawn = randomPosition(victim.character, victim.room);
+    victim.x = nextSpawn.x;
+    victim.y = nextSpawn.y;
+    victim.health = getMaxHealth(victim.character);
+    victim.deadSince = 0;
+    victim.soundwaveActive = false;
+    victim.shieldUntil = 0;
+    victim.protectedUntil = Date.now() + SPAWN_PROTECTION;
+    victim.lastShotAt = 0;
+    victim.dashUntil = 0;
+    victim.dashReadyAt = 0;
+    victim.parryUntil = 0;
+    victim.parryReadyAt = 0;
+  }, 1200);
+}
 function circleTouchesMask(mask, player, circleX, circleY, radius) {
   const left = player.x - mask.width / 2;
   const top = player.y - mask.height / 2;
@@ -326,7 +524,7 @@ io.on("connection", (socket) => {
   score.name = name;
   score.socketId = socket.id;
   scores.set(discordId, score);
-  const spawn = randomPosition("granny");
+  const spawn = randomPosition("granny", room);
   const p = {
     id: socket.id,
     discordId,
@@ -341,6 +539,8 @@ io.on("connection", (socket) => {
     parryStartedAt: 0,
     parryUntil: 0,
     parryReadyAt: 0,
+    shieldUntil: 0,
+    deadSince: 0,
     lastInputSeq: 0,
     dashId: 0,
     dashStartedAt: 0,
@@ -452,12 +652,14 @@ io.on("connection", (socket) => {
   });
   socket.on("active", (active) => {
     const nextActive = active === true;
-    if (nextActive && !p.active) {
-      const nextSpawn = randomPosition(p.character);
+    if (nextActive && (!p.active || p.health <= 0)) {
+      const nextSpawn = randomPosition(p.character, p.room);
       p.x = nextSpawn.x;
       p.y = nextSpawn.y;
       p.health = getMaxHealth(p.character);
       p.soundwaveActive = false;
+      p.deadSince = 0;
+      p.shieldUntil = 0;
       p.protectedUntil = Date.now() + SPAWN_PROTECTION;
       p.lastShotAt = 0;
       p.dashStartedAt = 0;
@@ -473,8 +675,30 @@ io.on("connection", (socket) => {
       p.protectedUntil = 0;
       p.dashUntil = 0;
       p.parryUntil = 0;
+      p.shieldUntil = 0;
+      p.deadSince = 0;
       for (let index = bullets.length - 1; index >= 0; index--)
         if (bullets[index].ownerId === p.id) bullets.splice(index, 1);
+    }
+  });
+  socket.on("respawn", () => {
+    if (!p.active) p.active = true;
+    if (p.health <= 0) {
+      const nextSpawn = randomPosition(p.character, p.room);
+      p.x = nextSpawn.x;
+      p.y = nextSpawn.y;
+      p.health = getMaxHealth(p.character);
+      p.deadSince = 0;
+      p.soundwaveActive = false;
+      p.shieldUntil = 0;
+      p.protectedUntil = Date.now() + SPAWN_PROTECTION;
+      p.lastShotAt = 0;
+      p.dashStartedAt = 0;
+      p.dashUntil = 0;
+      p.dashReadyAt = 0;
+      p.parryStartedAt = 0;
+      p.parryUntil = 0;
+      p.parryReadyAt = 0;
     }
   });
   socket.on("minigun", () => {
@@ -513,61 +737,6 @@ io.on("connection", (socket) => {
     )
       return;
 
-    // Sigma Tom, Mama Cyborg & Angry Granny Dash is replaced by the Shield Ability + 16-bullet Spiral Barrier!
-    if (p.character === "sigmatom" || p.character === "mama_cyborg" || p.character === "angry_granny" || payload?.sigmaShot) {
-      p.dashReadyAt = now + DASH_COOLDOWN;
-      // Activate deflect parry shield so incoming shots are deflected!
-      p.parryId += 1;
-      p.parryStartedAt = now;
-      p.parryUntil = now + PARRY_DURATION;
-      const stats = CHARACTER_STATS[p.character] || CHARACTER_STATS.granny;
-      p.parryReadyAt = now + (stats.parryCooldown || PARRY_COOLDOWN);
-
-      const isMama = p.character === "mama_cyborg";
-      const isAngry = p.character === "angry_granny";
-      const isEvolution = isMama || isAngry;
-      const NUM_SPIRAL = 16;
-      const bulletChar = isAngry ? "angry_granny_spiral" : (isMama ? "mama_cyborg_spiral" : "sigmatom_spiral");
-      const bRad = isEvolution ? 9 : 10;
-      const bDmg = isEvolution ? 2.2 : 2.0;
-      const spawnDist = characterRadius(p.character) + 20;
-
-      for (let i = 0; i < NUM_SPIRAL; i++) {
-        const angle = (i / NUM_SPIRAL) * Math.PI * 2;
-        const spiralSpeed = 280 + (i / NUM_SPIRAL) * 140;
-        const vx = Math.cos(angle) * spiralSpeed;
-        const vy = Math.sin(angle) * spiralSpeed;
-        bullets.push({
-          id: nextBulletId++,
-          ownerId: p.id,
-          room,
-          x: p.x + Math.cos(angle) * spawnDist,
-          y: p.y + Math.sin(angle) * spawnDist,
-          vx,
-          vy,
-          radius: bRad,
-          damage: bDmg,
-          character: bulletChar,
-          expiresAt: now + 2400,
-        });
-      }
-      io.to(room).emit("parry_started", {
-        playerId: p.id,
-        parryId: p.parryId,
-        parryStartedAt: p.parryStartedAt,
-        parryUntil: p.parryUntil,
-        parryReadyAt: p.parryReadyAt,
-      });
-      io.to(room).emit("sigma_shot", {
-        playerId: p.id,
-        x: p.x,
-        y: p.y,
-        dashReadyAt: p.dashReadyAt,
-        character: p.character,
-      });
-      return;
-    }
-
     // Default Dash: dashes towards where player is currently heading
     let dx = Number(payload?.x);
     let dy = Number(payload?.y);
@@ -579,7 +748,7 @@ io.on("connection", (socket) => {
       dx = Number(p.keys.right) - Number(p.keys.left);
       dy = Number(p.keys.down) - Number(p.keys.up);
       const kLen = Math.hypot(dx, dy);
-      if (kLen) {
+      if (kLen > 0.001) {
         dx /= kLen;
         dy /= kLen;
       } else {
@@ -611,11 +780,7 @@ io.on("connection", (socket) => {
       now - p.lastShotAt < ((p.character === "sigmatom" || p.minigun) ? MINIGUN_COOLDOWN : SHOT_COOLDOWN) ||
       !target ||
       !Number.isFinite(target.x) ||
-      !Number.isFinite(target.y) ||
-      target.x < 0 ||
-      target.x > WIDTH ||
-      target.y < 0 ||
-      target.y > HEIGHT
+      !Number.isFinite(target.y)
     )
       return;
     const dx = target.x - p.x;
@@ -625,6 +790,38 @@ io.on("connection", (socket) => {
     const direction = { x: dx / length, y: dy / length };
     p.lastShotAt = now;
     p.protectedUntil = 0;
+
+    // Grappler hook for Tom / Sigma Tom
+    if (target.grapple === true && p.character === "sigmatom") {
+      const hasHook = grapplerHooks.some((h) => h.ownerId === p.id && h.state !== "returning");
+      if (!hasHook) {
+        const muzzleDistance = characterRadius(p.character) + 30;
+        grapplerHooks.push({
+          id: nextHookId++,
+          ownerId: p.id,
+          room: p.room,
+          x: p.x + direction.x * muzzleDistance,
+          y: p.y + direction.y * muzzleDistance,
+          startX: p.x,
+          startY: p.y,
+          vx: direction.x * 960,
+          vy: direction.y * 960,
+          angle: Math.atan2(direction.y, direction.x),
+          state: "flying",
+          targetId: null,
+          maxDistance: 920,
+          createdAt: now,
+          expiresAt: now + 3000,
+        });
+        io.to(room).emit("hook_fired", {
+          playerId: p.id,
+          x: p.x,
+          y: p.y,
+        });
+      }
+      return;
+    }
+
     const stats = CHARACTER_STATS[p.character] || CHARACTER_STATS.granny;
     const bSpeed = stats.bulletSpeed || BULLET_SPEED;
     const bRadius = stats.bulletRadius || BULLET_RADIUS;
@@ -721,11 +918,12 @@ setInterval(() => {
       speed = CHARACTER_STATS[p.character].speed;
     }
     const radius = characterRadius(p.character);
-    p.x = clamp(p.x + dx * speed * dt, radius, WIDTH - radius);
-    p.y = clamp(p.y + dy * speed * dt, radius, HEIGHT - radius);
+    const clampedPos = clampToArena(p.x + dx * speed * dt, p.y + dy * speed * dt, radius);
+    p.x = clampedPos.x;
+    p.y = clampedPos.y;
   }
 
-  // Update Map Objects drifting and wall bounce
+  // Update Map Objects drifting and circular arena wall bounce
   for (const [room, objs] of roomObjects) {
     for (const obj of objs) {
       obj.x += obj.vx * dt;
@@ -733,14 +931,42 @@ setInterval(() => {
       obj.angle += obj.vAngle * dt;
       obj.vx *= Math.pow(0.97, dt * 60);
       obj.vy *= Math.pow(0.97, dt * 60);
-      if (obj.x < obj.radius) { obj.x = obj.radius; obj.vx = Math.abs(obj.vx) + 15; }
-      if (obj.x > WIDTH - obj.radius) { obj.x = WIDTH - obj.radius; obj.vx = -Math.abs(obj.vx) - 15; }
-      if (obj.y < obj.radius) { obj.y = obj.radius; obj.vy = Math.abs(obj.vy) + 15; }
-      if (obj.y > HEIGHT - obj.radius) { obj.y = HEIGHT - obj.radius; obj.vy = -Math.abs(obj.vy) - 15; }
+      const clamped = clampToArena(obj.x, obj.y, obj.radius);
+      if (clamped.clamped) {
+        obj.x = clamped.x;
+        obj.y = clamped.y;
+        const dot = obj.vx * clamped.nx + obj.vy * clamped.ny;
+        if (dot > 0) {
+          obj.vx -= 1.8 * dot * clamped.nx;
+          obj.vy -= 1.8 * dot * clamped.ny;
+        }
+      }
     }
   }
 
   const wallNow = Date.now();
+
+  // Dead Player Watchdog: Ensure no player stays stuck dead under any condition
+  for (const p of players.values()) {
+    if (p.active && p.health <= 0) {
+      if (!p.deadSince) p.deadSince = wallNow;
+      if (wallNow - p.deadSince > 1300) {
+        const nextSpawn = randomPosition(p.character, p.room);
+        p.x = nextSpawn.x;
+        p.y = nextSpawn.y;
+        p.health = getMaxHealth(p.character);
+        p.deadSince = 0;
+        p.soundwaveActive = false;
+        p.shieldUntil = 0;
+        p.protectedUntil = wallNow + SPAWN_PROTECTION;
+        p.lastShotAt = 0;
+        p.dashUntil = 0;
+        p.dashReadyAt = 0;
+        p.parryUntil = 0;
+        p.parryReadyAt = 0;
+      }
+    }
+  }
 
   // Health Regeneration: All players regenerate health over time!
   for (const p of players.values()) {
@@ -764,16 +990,30 @@ setInterval(() => {
       const pRadius = characterRadius(p.character);
       const dist = Math.hypot(p.x - obj.x, p.y - obj.y);
       const minDist = pRadius + obj.radius;
-      if (dist < minDist && dist > 0.001) {
-        const nx = (p.x - obj.x) / dist;
-        const ny = (p.y - obj.y) / dist;
+      if (dist < minDist) {
+        let nx, ny;
+        if (dist > 0.001) {
+          nx = (p.x - obj.x) / dist;
+          ny = (p.y - obj.y) / dist;
+        } else {
+          const randAngle = Math.random() * Math.PI * 2;
+          nx = Math.cos(randAngle);
+          ny = Math.sin(randAngle);
+        }
         const overlap = minDist - dist;
-        p.x += nx * overlap * 0.55;
-        p.y += ny * overlap * 0.55;
-        obj.x -= nx * overlap * 0.45;
-        obj.y -= ny * overlap * 0.45;
+        p.x += nx * (overlap * 0.6 + 2);
+        p.y += ny * (overlap * 0.6 + 2);
+        obj.x -= nx * (overlap * 0.4 + 2);
+        obj.y -= ny * (overlap * 0.4 + 2);
 
-        const isParrying = p.parryUntil > wallNow;
+        const clampedP = clampToArena(p.x, p.y, pRadius);
+        p.x = clampedP.x;
+        p.y = clampedP.y;
+        const clampedObj = clampToArena(obj.x, obj.y, obj.radius);
+        obj.x = clampedObj.x;
+        obj.y = clampedObj.y;
+
+        const isParrying = p.parryUntil > wallNow || (p.shieldUntil && p.shieldUntil > wallNow);
         const isDashing = p.dashUntil > wallNow;
 
         if (isParrying) {
@@ -782,16 +1022,25 @@ setInterval(() => {
           obj.vy -= ny * 200;
         } else if (isDashing) {
           obj.hp -= 4.0;
-          p.health = Math.max(0, p.health - 0.2);
           p.lastDamageAt = wallNow;
+          if (p.health - 0.2 <= 0) {
+            killPlayer(p, null, "car");
+          } else {
+            p.health = Math.max(0, p.health - 0.2);
+            io.to(p.id).emit("damage_taken", { health: p.health, damage: 0.2, attackerCharacter: "car" });
+          }
           obj.vx -= nx * 280;
           obj.vy -= ny * 280;
         } else {
           if (p.protectedUntil <= wallNow && (!p.lastObjectHitAt || wallNow - p.lastObjectHitAt > 450)) {
             p.lastObjectHitAt = wallNow;
             p.lastDamageAt = wallNow;
-            p.health = Math.max(0, p.health - obj.contactDamage);
-            io.to(p.id).emit("jumpscare", { health: p.health, damage: obj.contactDamage });
+            if (p.health - obj.contactDamage <= 0) {
+              killPlayer(p, null, "car");
+            } else {
+              p.health = Math.max(0, p.health - obj.contactDamage);
+              io.to(p.id).emit("damage_taken", { health: p.health, damage: obj.contactDamage, attackerCharacter: "car" });
+            }
           }
           obj.hp -= 1.5;
           obj.vx -= nx * 90;
@@ -841,45 +1090,27 @@ setInterval(() => {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
         if (Math.abs(angleDiff) <= coneSpread) {
           const damage = 0.55;
-          target.health = Math.max(0, target.health - damage);
           target.lastDamageAt = wallNow;
 
-          // Seismic earthquake knockback
+          // Seismic earthquake knockback clamped to circular arena
           const knockback = (1 - dist / coneRange) * 26 + 10;
-          target.x = clamp(target.x + Math.cos(angleToTarget) * knockback, characterRadius(target.character), WIDTH - characterRadius(target.character));
-          target.y = clamp(target.y + Math.sin(angleToTarget) * knockback, characterRadius(target.character), HEIGHT - characterRadius(target.character));
+          const knocked = clampToArena(
+            target.x + Math.cos(angleToTarget) * knockback,
+            target.y + Math.sin(angleToTarget) * knockback,
+            characterRadius(target.character)
+          );
+          target.x = knocked.x;
+          target.y = knocked.y;
 
-          io.to(target.id).emit("jumpscare", {
-            health: target.health,
-            damage,
-            attackerCharacter: "sigmatom_soundwave",
-          });
-
-          if (target.health === 0) {
-            target.score.deaths += 1;
-            p.score.kills += 1;
-            awardXp(p, 50);
-            target.xp = Math.floor((target.xp || 0) * 0.5);
-            target.level = getLevelForXp(target.xp);
-            io.to(target.id).emit("xp_update", {
-              xp: target.xp,
-              level: target.level,
-              lost: true,
-              nextLevelXp: getXpForNextLevel(target.level),
+          if (target.health - damage <= 0) {
+            killPlayer(target, p.id, "sigmatom_soundwave");
+          } else {
+            target.health = Math.max(0, target.health - damage);
+            io.to(target.id).emit("damage_taken", {
+              health: target.health,
+              damage,
+              attackerCharacter: "sigmatom_soundwave",
             });
-            setTimeout(() => {
-              if (!players.has(target.id)) return;
-              const nextSpawn = randomPosition(target.character);
-              target.x = nextSpawn.x;
-              target.y = nextSpawn.y;
-              target.health = getMaxHealth(target.character);
-              target.protectedUntil = Date.now() + SPAWN_PROTECTION;
-              target.lastShotAt = 0;
-              target.dashUntil = 0;
-              target.dashReadyAt = 0;
-              target.parryUntil = 0;
-              target.parryReadyAt = 0;
-            }, 1200);
           }
         }
       }
@@ -1025,7 +1256,8 @@ setInterval(() => {
       bullet.x < -bRadius ||
       bullet.x > WIDTH + bRadius ||
       bullet.y < -bRadius ||
-      bullet.y > HEIGHT + bRadius
+      bullet.y > HEIGHT + bRadius ||
+      Math.hypot(bullet.x - ARENA_CENTER.x, bullet.y - ARENA_CENTER.y) > ARENA_RADIUS + bRadius + 15
     ) {
       bullets.splice(i, 1);
       continue;
@@ -1086,7 +1318,7 @@ setInterval(() => {
         !defender.active ||
         defender.health <= 0 ||
         defender.id === bullet.ownerId ||
-        defender.parryUntil <= wallNow
+        (defender.parryUntil <= wallNow && (!defender.shieldUntil || defender.shieldUntil <= wallNow))
       )
         continue;
       const contact = sweptBulletTouchesParry(
@@ -1139,68 +1371,142 @@ setInterval(() => {
         return sweptBulletTouchesPlayer(bullet, target, previousX, previousY);
       });
     if (hit) {
-      hit.health = Math.max(0, hit.health - bullet.damage);
-      hit.lastDamageAt = wallNow;
-      io.to(hit.id).emit("jumpscare", {
-        health: hit.health,
-        damage: bullet.damage,
-        attackerCharacter: bullet.character,
-      });
-      if (hit.health === 0) {
-        hit.score.deaths += 1;
-        const attacker = players.get(bullet.ownerId);
-        if (attacker && attacker.room === hit.room) {
-          attacker.score.kills += 1;
-          awardXp(attacker, 50); // Elimination bonus
-        }
-        // In Diep.io, dying halves XP / level
-        hit.xp = Math.floor((hit.xp || 0) * 0.5);
-        hit.level = getLevelForXp(hit.xp);
-
-        // If player had an evolved form and dropped below level 10, revert back to their base character
-        let demoted = false;
-        if (hit.character === "mama_cyborg" && hit.level < 10) {
-          hit.character = "cyborg";
-          demoted = true;
-          io.to(hit.room).emit("character_switched", {
-            playerId: hit.id,
-            character: "cyborg",
-          });
-        } else if (hit.character === "angry_granny" && hit.level < 10) {
-          hit.character = "granny";
-          demoted = true;
-          io.to(hit.room).emit("character_switched", {
-            playerId: hit.id,
-            character: "granny",
-          });
-        }
-
-        io.to(hit.id).emit("xp_update", {
-          xp: hit.xp,
-          level: hit.level,
-          lost: true,
-          demoted,
-          nextLevelXp: getXpForNextLevel(hit.level),
+      if (hit.health - bullet.damage <= 0) {
+        killPlayer(hit, bullet.ownerId, bullet.character);
+      } else {
+        hit.health = Math.max(0, hit.health - bullet.damage);
+        hit.lastDamageAt = wallNow;
+        io.to(hit.id).emit("damage_taken", {
+          health: hit.health,
+          damage: bullet.damage,
+          attackerCharacter: bullet.character,
         });
-
-        setTimeout(() => {
-          if (!players.has(hit.id)) return;
-          const nextSpawn = randomPosition(hit.character);
-          hit.x = nextSpawn.x;
-          hit.y = nextSpawn.y;
-          hit.health = getMaxHealth(hit.character);
-          hit.soundwaveActive = false;
-          hit.protectedUntil = Date.now() + SPAWN_PROTECTION;
-          hit.lastShotAt = 0;
-          hit.dashUntil = 0;
-          hit.dashReadyAt = 0;
-          hit.parryUntil = 0;
-          hit.parryReadyAt = 0;
-        }, 1200);
       }
       bullets.splice(i, 1);
     }
   }
+
+  // Update Grappler Hooks Physics & Auto-Aim
+  for (let hi = grapplerHooks.length - 1; hi >= 0; hi--) {
+    const hook = grapplerHooks[hi];
+    const owner = players.get(hook.ownerId);
+    if (!owner || !owner.active || owner.health <= 0 || wallNow > hook.expiresAt) {
+      grapplerHooks.splice(hi, 1);
+      continue;
+    }
+
+    if (hook.state === "flying") {
+      // Auto-aim: Steer towards nearest active enemy player in room
+      const roomPids = rooms.get(hook.room) || new Set();
+      let bestTarget = null;
+      let bestDist = 680;
+      for (const pid of roomPids) {
+        if (pid === hook.ownerId) continue;
+        const target = players.get(pid);
+        if (!target || !target.active || target.health <= 0 || target.protectedUntil > wallNow) continue;
+        const d = Math.hypot(target.x - hook.x, target.y - hook.y);
+        if (d < bestDist) {
+          const angleToT = Math.atan2(target.y - hook.y, target.x - hook.x);
+          let diff = angleToT - hook.angle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          if (Math.abs(diff) < 1.35) {
+            bestDist = d;
+            bestTarget = target;
+          }
+        }
+      }
+
+      if (bestTarget) {
+        const desiredAngle = Math.atan2(bestTarget.y - hook.y, bestTarget.x - hook.x);
+        let angleDiff = desiredAngle - hook.angle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        const maxTurn = 8.5 * dt;
+        hook.angle += clamp(angleDiff, -maxTurn, maxTurn);
+        const hookSpeed = 960;
+        hook.vx = Math.cos(hook.angle) * hookSpeed;
+        hook.vy = Math.sin(hook.angle) * hookSpeed;
+      }
+
+      hook.x += hook.vx * dt;
+      hook.y += hook.vy * dt;
+
+      // Check max range from owner
+      const distFromOwner = Math.hypot(hook.x - owner.x, hook.y - owner.y);
+      if (distFromOwner > hook.maxDistance) {
+        hook.state = "returning";
+      }
+
+      // Check collision with enemy players
+      for (const pid of roomPids) {
+        if (pid === hook.ownerId) continue;
+        const victim = players.get(pid);
+        if (!victim || !victim.active || victim.health <= 0 || victim.protectedUntil > wallNow) continue;
+        const vRadius = characterRadius(victim.character);
+        if (Math.hypot(hook.x - victim.x, hook.y - victim.y) < vRadius + 24) {
+          hook.state = "pulling";
+          hook.targetId = victim.id;
+          hook.pullExpiresAt = wallNow + 2500;
+          victim.lastDamageAt = wallNow;
+          const grappleDamage = 1.8;
+          if (victim.health - grappleDamage <= 0) {
+            killPlayer(victim, owner.id, "hook");
+            grapplerHooks.splice(hi, 1);
+          } else {
+            victim.health = Math.max(0, victim.health - grappleDamage);
+            io.to(victim.id).emit("damage_taken", {
+              health: victim.health,
+              damage: grappleDamage,
+              attackerCharacter: "hook",
+            });
+          }
+          break;
+        }
+      }
+    } else if (hook.state === "pulling") {
+      const victim = players.get(hook.targetId);
+      if (!victim || !victim.active || victim.health <= 0 || (hook.pullExpiresAt && wallNow > hook.pullExpiresAt)) {
+        grapplerHooks.splice(hi, 1);
+        continue;
+      }
+
+      // Pull victim towards owner
+      const dx = owner.x - victim.x;
+      const dy = owner.y - victim.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 78) {
+        const pullSpeed = 880;
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        const pulled = clampToArena(
+          victim.x + dirX * pullSpeed * dt,
+          victim.y + dirY * pullSpeed * dt,
+          characterRadius(victim.character)
+        );
+        victim.x = pulled.x;
+        victim.y = pulled.y;
+        hook.x = victim.x;
+        hook.y = victim.y;
+        hook.angle = Math.atan2(-dy, -dx);
+      } else {
+        grapplerHooks.splice(hi, 1);
+      }
+    } else if (hook.state === "returning") {
+      const dx = owner.x - hook.x;
+      const dy = owner.y - hook.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 65) {
+        const returnSpeed = 1150;
+        hook.x += (dx / dist) * returnSpeed * dt;
+        hook.y += (dy / dist) * returnSpeed * dt;
+        hook.angle = Math.atan2(dy, dx);
+      } else {
+        grapplerHooks.splice(hi, 1);
+      }
+    }
+  }
+
   physicsTicks += 1;
   if (physicsTicks % 3 !== 0) return;
   worldSequence += 1;
@@ -1221,6 +1527,7 @@ setInterval(() => {
         parryStartedAt: p.parryStartedAt,
         parryUntil: p.parryUntil,
         parryReadyAt: p.parryReadyAt,
+        shieldUntil: p.shieldUntil || 0,
         dashId: p.dashId,
         dashStartedAt: p.dashStartedAt,
         dashUntil: p.dashUntil,
@@ -1266,6 +1573,17 @@ setInterval(() => {
         hp: Math.round(o.hp * 10) / 10,
         maxHp: o.maxHp,
       })),
+      hooks: grapplerHooks
+        .filter((h) => h.room === room)
+        .map(({ id, ownerId, x, y, angle, state, targetId }) => ({
+          id,
+          ownerId,
+          x: Math.round(x * 10) / 10,
+          y: Math.round(y * 10) / 10,
+          angle: Math.round(angle * 100) / 100,
+          state,
+          targetId,
+        })),
       bullets: bullets
         .filter((bullet) => bullet.room === room)
         .map(({ id, x, y, vx, vy, character, radius }) => ({
