@@ -887,8 +887,8 @@ setInterval(() => {
       bullet.character = defender.character;
       bullet.damage = CHARACTER_STATS[defender.character].damage;
       bullet.canSplit = defender.character === "mama_cyborg";
-      bullet.splitAt = defender.character === "mama_cyborg" ? wallNow + 2000 : 0;
-      bullet.expiresAt = wallNow + (defender.character === "mama_cyborg" ? 2000 : BULLET_LIFETIME);
+      bullet.splitAt = defender.character === "mama_cyborg" ? wallNow + 1000 : 0;
+      bullet.expiresAt = wallNow + (defender.character === "mama_cyborg" ? 1200 : BULLET_LIFETIME);
       io.to(bullet.room).emit("shot_deflected", {
         playerId: defender.id,
         x: bullet.x,
@@ -927,6 +927,29 @@ setInterval(() => {
           attacker.score.kills += 1;
           awardXp(attacker, 50); // Elimination bonus
         }
+        // In Diep.io, dying halves XP / level
+        hit.xp = Math.floor((hit.xp || 0) * 0.5);
+        hit.level = getLevelForXp(hit.xp);
+
+        // If player had Mama Cyborg and dropped below level 10, revert back to cyborg
+        let demoted = false;
+        if (hit.character === "mama_cyborg" && hit.level < 10) {
+          hit.character = "cyborg";
+          demoted = true;
+          io.to(hit.room).emit("character_switched", {
+            playerId: hit.id,
+            character: "cyborg",
+          });
+        }
+
+        io.to(hit.id).emit("xp_update", {
+          xp: hit.xp,
+          level: hit.level,
+          lost: true,
+          demoted,
+          nextLevelXp: getXpForNextLevel(hit.level),
+        });
+
         setTimeout(() => {
           if (!players.has(hit.id)) return;
           const nextSpawn = randomPosition(hit.character);
