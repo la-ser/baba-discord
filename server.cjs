@@ -244,6 +244,10 @@ function killPlayer(victim, killerId = null, attackerCharacter = "environment") 
   if (attacker && attacker.room === victim.room) {
     attacker.score.kills += 1;
     awardXp(attacker, 50); // Elimination bonus
+    io.to(attacker.id).emit("hit_marker", {
+      targetId: victim.id,
+      kill: true,
+    });
     io.to(victim.room).emit("player_kill", {
       killerId: attacker.id,
       killerName: attacker.name,
@@ -1111,6 +1115,11 @@ setInterval(() => {
               damage,
               attackerCharacter: "sigmatom_soundwave",
             });
+            io.to(p.id).emit("hit_marker", {
+              targetId: target.id,
+              damage,
+              kill: false,
+            });
           }
         }
       }
@@ -1381,6 +1390,11 @@ setInterval(() => {
           damage: bullet.damage,
           attackerCharacter: bullet.character,
         });
+        io.to(bullet.ownerId).emit("hit_marker", {
+          targetId: hit.id,
+          damage: bullet.damage,
+          kill: false,
+        });
       }
       bullets.splice(i, 1);
     }
@@ -1459,6 +1473,11 @@ setInterval(() => {
               health: victim.health,
               damage: grappleDamage,
               attackerCharacter: "hook",
+            });
+            io.to(owner.id).emit("hit_marker", {
+              targetId: victim.id,
+              damage: grappleDamage,
+              kill: false,
             });
           }
           break;
