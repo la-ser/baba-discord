@@ -354,7 +354,7 @@ class HordeGame {
     this.enemies = [];
     this.enemiesSpawnedThisWave = 0;
     this.enemiesToSpawnThisWave = 6;
-    this.lastSpawnAt = Date.now() + 1500;
+    this.lastSpawnAt = Date.now() - 2400;
     this.spawnInterval = 3200;
     this.nextEnemyId = 1;
     this.lastBaseDamageAt = 0;
@@ -992,7 +992,14 @@ function initHordeGame(room) {
   if (!hordeGames.has(room)) {
     hordeGames.set(room, new HordeGame(room));
   }
-  return hordeGames.get(room);
+  const h = hordeGames.get(room);
+  if (!Number.isFinite(h.baseHealth) || (h.baseHealth <= 0 && h.waveState !== "game_over")) {
+    h.baseHealth = 100;
+  }
+  if (!Number.isFinite(h.maxBaseHealth) || h.maxBaseHealth <= 0) {
+    h.maxBaseHealth = 100;
+  }
+  return h;
 }
 
 function getMaxHealth(character) {
@@ -1632,13 +1639,20 @@ io.on("connection", (socket) => {
   });
   socket.on("switch_mode", (targetMode) => {
     const validMode = targetMode === "horde" ? "horde" : "ffa";
-    if (p.mode === validMode) return;
+    const targetRoom = `activity:${instanceId}:${validMode}`;
+    if (p.mode === validMode && p.room === targetRoom && rooms.get(targetRoom)?.has(socket.id)) {
+      if (validMode === "horde") {
+        initHordeGame(targetRoom);
+      }
+      socket.emit("mode_switched", { mode: validMode, character: p.character });
+      return;
+    }
     const oldRoom = p.room;
     socket.leave(oldRoom);
     rooms.get(oldRoom)?.delete(socket.id);
 
     p.mode = validMode;
-    const newRoom = `activity:${instanceId}:${validMode}`;
+    const newRoom = targetRoom;
     p.room = newRoom;
     socket.join(newRoom);
     if (!rooms.has(newRoom)) rooms.set(newRoom, new Set());
@@ -1809,6 +1823,21 @@ io.on("connection", (socket) => {
       p.parryReadyAt = 0;
     }
     p.active = nextActive;
+    if (p.mode === "horde" && p.active) {
+      const horde = initHordeGame(p.room);
+      if (horde && horde.waveState === "upgrade_selection") {
+        if (!horde.cardOfferings.has(socket.id)) {
+          horde.pendingPlayersToChoose.add(socket.id);
+          const cards = horde.generateCardOptions(p);
+          horde.cardOfferings.set(socket.id, cards);
+          socket.emit("horde_upgrade_options", {
+            wave: horde.wave,
+            options: cards,
+            baseHealth: Math.round(horde.baseHealth * 10) / 10,
+          });
+        }
+      }
+    }
     if (!p.active) {
       p.keys = { up: false, down: false, left: false, right: false };
       p.protectedUntil = 0;
@@ -1822,6 +1851,9 @@ io.on("connection", (socket) => {
   });
   socket.on("respawn", () => {
     if (!p.active) p.active = true;
+    if (p.mode === "horde") {
+      initHordeGame(p.room);
+    }
     if (p.health <= 0) {
       const nextSpawn = getPlayerSpawn(p.character, p.room);
       p.x = nextSpawn.x;
@@ -2101,6 +2133,11 @@ setInterval(() => {
   const wallNow = Date.now();
 
   // Update Horde Game Waves & Enemies
+  for (const r of rooms.keys()) {
+    if (r.endsWith(":horde") && !hordeGames.has(r)) {
+      initHordeGame(r);
+    }
+  }
   for (const horde of hordeGames.values()) {
     const roomPlayerIds = rooms.get(horde.room) || new Set();
     horde.update(dt, wallNow, roomPlayerIds, bullets, io);
@@ -2862,15 +2899,18 @@ setInterval(() => {
         b.kills - a.kills || a.deaths - b.deaths || a.name.localeCompare(b.name),
       );
     const isHordeRoom = room.endsWith(":horde");
+    if (isHordeRoom && !hordeGames.has(room)) {
+      initHordeGame(room);
+    }
     const horde = isHordeRoom ? hordeGames.get(room) : null;
     const hordePayload = horde ? {
       mode: "horde",
-      baseHealth: Math.round(horde.baseHealth * 10) / 10,
-      maxBaseHealth: horde.maxBaseHealth,
-      wave: horde.wave,
-      waveState: horde.waveState,
-      enemiesRemaining: horde.enemies.length + (horde.enemiesToSpawnThisWave - horde.enemiesSpawnedThisWave),
-      intermissionRemaining: Math.max(0, Math.ceil((horde.intermissionUntil - Date.now()) / 1000)),
+      baseHealth: Number.isFinite(horde.baseHealth) ? Math.round(horde.baseHealth * 10) / 10 : 100,
+      maxBaseHealth: Number.isFinite(horde.maxBaseHealth) ? horde.maxBaseHealth : 100,
+      wave: horde.wave || 1,
+      waveState: horde.waveState || "active",
+      enemiesRemaining: Math.max(0, (horde.enemies ? horde.enemies.length : 0) + ((horde.enemiesToSpawnThisWave || 0) - (horde.enemiesSpawnedThisWave || 0))),
+      intermissionRemaining: Math.max(0, Math.ceil(((horde.intermissionUntil || 0) - Date.now()) / 1000)),
       grannyTurretLevel: horde.grannyTurretLevel || 0,
       healAuraLevel: horde.healAuraLevel || 0,
       healAuraRadius: horde.healAuraLevel > 0 ? (220 + horde.healAuraLevel * 20) : 0,
