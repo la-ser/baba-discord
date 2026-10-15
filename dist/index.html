@@ -202,12 +202,103 @@
         color: var(--accent-red);
       }
       .main-desc {
-        margin: 0 0 28px;
+        margin: 0 0 16px;
         color: var(--text-secondary);
         font-size: 13px;
         line-height: 1.5;
         max-width: 360px;
       }
+
+      /* Callsign / Username Dock */
+      .callsign-dock {
+        margin: 0 0 18px;
+        max-width: 300px;
+      }
+      .callsign-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+      .callsign-label {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+      .callsign-sync-tag {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        color: #22c55e;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        transition: color 0.2s;
+      }
+      .callsign-input-wrap {
+        display: flex;
+        align-items: center;
+        background: rgba(8, 14, 26, 0.75);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 3px 4px 3px 10px;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .callsign-input-wrap:focus-within {
+        border-color: var(--accent-red);
+        box-shadow: 0 0 12px rgba(255, 51, 75, 0.25);
+      }
+      .callsign-hash {
+        color: var(--accent-red);
+        font-family: var(--font-mono);
+        font-weight: 900;
+        font-size: 13px;
+        margin-right: 6px;
+        user-select: none;
+      }
+      .callsign-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #ffffff;
+        font-family: var(--font-sans);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        min-width: 0;
+        padding: 6px 0;
+      }
+      .callsign-input::placeholder {
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+      .callsign-save-btn {
+        height: 30px;
+        padding: 0 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border-subtle);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+      }
+      .callsign-save-btn:hover {
+        background: var(--accent-red);
+        border-color: var(--accent-red);
+        color: #ffffff;
+      }
+      .callsign-save-btn.saved {
+        background: #22c55e !important;
+        border-color: #22c55e !important;
+        color: #ffffff !important;
+      }
+
       .menu-nav {
         display: grid;
         gap: 10px;
@@ -290,129 +381,305 @@
         font-family: var(--font-mono);
       }
 
-      /* CHARACTER SELECTION MODAL */
+      /* CHARACTER SELECTION MODAL - HIGH-TECH DUAL LINEAGE */
       .roster-container {
-        width: min(880px, 94vw);
-        padding: 32px;
-        border-radius: 16px;
-        border: 1px solid var(--border-med);
-        background: var(--surface-card);
-        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+        width: min(840px, 95vw);
+        max-height: min(92vh, 480px);
+        overflow-y: auto;
+        padding: 16px 22px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(8, 12, 22, 0.96);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.88), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
       }
       .roster-header {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         justify-content: space-between;
-        margin-bottom: 22px;
+        gap: 16px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 8px;
       }
-      .roster-header h2 {
-        margin: 0;
-        font-size: 28px;
+      .roster-header-left h2 {
+        margin: 2px 0 0;
+        font-size: 18px;
         font-weight: 900;
-        letter-spacing: -0.03em;
+        letter-spacing: -0.02em;
         text-transform: uppercase;
+        color: #ffffff;
       }
-      .roster-grid {
+      .roster-tip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 3px 8px;
+        border-radius: 6px;
+      }
+      .roster-tip .tip-icon {
+        color: #ffbe1a;
+      }
+
+      /* Lineage 2-Column Grid */
+      .lineage-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 14px;
       }
-      .character-card {
-        display: grid;
-        grid-template-columns: 120px 1fr;
-        gap: 18px;
-        padding: 18px;
+      @media (max-width: 680px) {
+        .lineage-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .lineage-column {
+        display: flex;
+        flex-direction: column;
+        background: rgba(12, 17, 30, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 12px;
-        background: rgba(10, 14, 24, 0.65);
-        border: 1px solid var(--border-subtle);
-        cursor: pointer;
-        text-align: left;
-        transition: border-color 0.15s, background 0.15s, transform 0.15s;
+        padding: 10px 12px;
+        gap: 6px;
         position: relative;
       }
+      .lineage-tag {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-red);
+        margin-bottom: 2px;
+      }
+      .lineage-bullet {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent-red);
+        box-shadow: 0 0 8px var(--accent-red);
+      }
+      .interceptor-tag {
+        color: #00e5ff;
+      }
+      .interceptor-bullet {
+        background: #00e5ff;
+        box-shadow: 0 0 8px #00e5ff;
+      }
+
+      /* Character Card inside Lineage */
+      .character-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(16, 23, 40, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
+        position: relative;
+        width: 100%;
+        box-sizing: border-box;
+      }
       .character-card:hover {
-        background: rgba(15, 20, 34, 0.85);
-        border-color: var(--border-med);
-        transform: translateY(-2px);
+        background: rgba(22, 32, 54, 0.9);
+        border-color: rgba(255, 255, 255, 0.22);
+        transform: translateY(-1px);
       }
       .character-card.selected {
         border-color: var(--accent-red);
-        background: rgba(255, 51, 75, 0.06);
-        box-shadow: 0 0 0 1px var(--accent-red), 0 12px 30px rgba(0, 0, 0, 0.4);
+        background: rgba(255, 51, 75, 0.08);
+        box-shadow: 0 0 0 1px var(--accent-red), 0 8px 20px rgba(255, 51, 75, 0.22);
+      }
+      .character-card[data-character="granny"].selected {
+        border-color: #00e5ff;
+        background: rgba(0, 229, 255, 0.08);
+        box-shadow: 0 0 0 1px #00e5ff, 0 8px 20px rgba(0, 229, 255, 0.22);
+      }
+      .character-card[data-character="mama_cyborg"].selected {
+        border-color: #f43f5e;
+        background: rgba(244, 63, 94, 0.08);
+        box-shadow: 0 0 0 1px #f43f5e, 0 8px 20px rgba(244, 63, 94, 0.22);
+      }
+      .character-card[data-character="angry_granny"].selected {
+        border-color: #f97316;
+        background: rgba(249, 115, 22, 0.08);
+        box-shadow: 0 0 0 1px #f97316, 0 8px 20px rgba(249, 115, 22, 0.22);
       }
       .character-card.selected::after {
-        content: "SELECTED";
+        content: "ACTIVE";
         position: absolute;
-        top: 12px;
-        right: 12px;
+        top: 6px;
+        right: 8px;
         font-family: var(--font-mono);
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 900;
         letter-spacing: 0.1em;
         color: var(--accent-red);
+        background: rgba(255, 51, 75, 0.18);
+        padding: 1px 5px;
+        border-radius: 3px;
       }
-      .portrait {
+      .character-card[data-character="granny"].selected::after {
+        color: #00e5ff;
+        background: rgba(0, 229, 255, 0.18);
+      }
+      .character-card[data-character="mama_cyborg"].selected::after {
+        color: #f43f5e;
+        background: rgba(244, 63, 94, 0.18);
+      }
+      .character-card[data-character="angry_granny"].selected::after {
+        color: #f97316;
+        background: rgba(249, 115, 22, 0.18);
+      }
+      .card-portrait-wrap {
+        width: 48px;
+        height: 48px;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.02);
-        border-radius: 8px;
-        min-height: 140px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding: 2px;
       }
-      .portrait img {
-        max-width: 90%;
-        max-height: 125px;
+      .card-portrait-wrap img {
+        max-width: 100%;
+        max-height: 100%;
         object-fit: contain;
-        filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.6));
+        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
       }
-      .character-copy h3 {
-        margin: 0;
-        font-size: 20px;
-        font-weight: 850;
+      .evo-portrait {
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.4));
+        border-color: rgba(255, 255, 255, 0.16);
       }
-      .character-copy p {
-        margin: 4px 0 14px;
-        color: var(--text-secondary);
-        font-size: 12px;
-        line-height: 1.45;
+      .card-details {
+        flex: 1;
+        min-width: 0;
       }
-      .stats {
-        display: grid;
-        gap: 6px;
-      }
-      .stat {
-        display: grid;
-        grid-template-columns: 60px 1fr;
+      .card-title-row {
+        display: flex;
         align-items: center;
-        gap: 8px;
-        color: var(--text-muted);
+        gap: 6px;
+        margin-bottom: 2px;
+      }
+      .card-name {
+        font-size: 13px;
+        font-weight: 850;
+        color: #ffffff;
+        white-space: nowrap;
+      }
+      .base-badge {
         font-family: var(--font-mono);
-        font-size: 9px;
+        font-size: 8px;
         font-weight: 800;
         letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .meter {
-        height: 5px;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.06);
+        padding: 1px 4px;
         border-radius: 3px;
-        background: rgba(255, 255, 255, 0.08);
+      }
+      .card-ability-line {
+        font-size: 10.5px;
+        color: var(--text-secondary);
+        white-space: nowrap;
         overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 4px;
       }
-      .meter i {
-        display: block;
-        width: var(--value);
-        height: 100%;
-        border-radius: inherit;
-        background: #ffffff;
+      .card-metrics {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
       }
-      .character-card.selected .meter i {
-        background: var(--accent-red);
+      .metric-pill {
+        font-family: var(--font-mono);
+        font-size: 8.5px;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 1px 4px;
+        border-radius: 3px;
       }
+      .metric-pill strong {
+        color: var(--text-primary);
+      }
+      .evo-metric {
+        color: #ffd166;
+        border-color: rgba(255, 209, 102, 0.2);
+        background: rgba(255, 209, 102, 0.06);
+      }
+
+      /* Evolution Connector */
+      .evolution-branch {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 1px 2px;
+      }
+      .evo-branch-line {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02));
+      }
+      .evo-branch-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-family: var(--font-mono);
+        font-size: 8.5px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #ffbe1a;
+        background: rgba(255, 190, 26, 0.08);
+        border: 1px dashed rgba(255, 190, 26, 0.35);
+        padding: 1px 7px;
+        border-radius: 10px;
+      }
+      .evo-arrow {
+        font-size: 8px;
+      }
+
+      .character-card.locked {
+        opacity: 0.65;
+        border-style: dashed;
+      }
+      .character-card.locked:hover {
+        opacity: 0.85;
+      }
+      .lock-indicator {
+        font-family: var(--font-mono);
+        font-size: 8.5px;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: rgba(255, 190, 26, 0.15);
+        border: 1px solid rgba(255, 190, 26, 0.3);
+        color: #ffbe1a;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+      }
+
       .roster-actions {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
         gap: 12px;
-        margin-top: 22px;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
       }
 
       /* IN-GAME HUD (Framed directly inside #game-viewport) */
@@ -1613,83 +1880,14 @@
         transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
       }
 
-      /* Roster Card 3-Column & Sigma Tom */
-      .roster-grid {
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
-      }
-      .character-card.locked {
-        opacity: 0.65;
-        filter: grayscale(0.4);
-      }
-      .character-card.locked:hover {
-        opacity: 0.85;
-        filter: grayscale(0.2);
-      }
-      .card-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-      }
-      .lock-indicator {
-        font-family: var(--font-mono);
-        font-size: 9px;
-        font-weight: 800;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: rgba(255, 190, 26, 0.15);
-        border: 1px solid rgba(255, 190, 26, 0.3);
-        color: #ffbe1a;
-        letter-spacing: 0.05em;
-        white-space: nowrap;
-      }
-      .character-card[data-character="mama_cyborg"].selected {
-        border-color: #f43f5e;
-        background: rgba(244, 63, 94, 0.08);
-        box-shadow: 0 0 0 1px #f43f5e, 0 12px 30px rgba(244, 63, 94, 0.35);
-      }
-      .character-card[data-character="mama_cyborg"].selected::after {
-        color: #f43f5e;
-      }
-      .character-card[data-character="mama_cyborg"] .portrait {
-        background: radial-gradient(circle, rgba(244, 63, 94, 0.15), transparent 70%);
-      }
-      .character-card[data-character="mama_cyborg"] img {
-        max-height: 120px;
-        object-fit: contain;
-        filter: drop-shadow(0 4px 12px rgba(244, 63, 94, 0.4));
-      }
-      .character-card[data-character="angry_granny"].selected {
-        border-color: #f97316;
-        background: rgba(249, 115, 22, 0.08);
-        box-shadow: 0 0 0 1px #f97316, 0 12px 30px rgba(249, 115, 22, 0.35);
-      }
-      .character-card[data-character="angry_granny"].selected::after {
-        color: #f97316;
-      }
-      .character-card[data-character="angry_granny"] .portrait {
-        background: radial-gradient(circle, rgba(249, 115, 22, 0.15), transparent 70%);
-      }
-      .character-card[data-character="angry_granny"] img {
-        max-height: 120px;
-        object-fit: contain;
-        filter: drop-shadow(0 4px 12px rgba(249, 115, 22, 0.4));
-      }
+      /* Sigma Tom Secret Card Highlight */
       .character-card[data-character="sigmatom"].selected {
         border-color: #a855f7;
         background: rgba(168, 85, 247, 0.08);
-        box-shadow: 0 0 0 1px #a855f7, 0 12px 30px rgba(168, 85, 247, 0.35);
+        box-shadow: 0 0 0 1px #a855f7, 0 8px 24px rgba(168, 85, 247, 0.35);
       }
       .character-card[data-character="sigmatom"].selected::after {
         color: #a855f7;
-      }
-      .character-card[data-character="sigmatom"] .portrait {
-        background: radial-gradient(circle, rgba(168, 85, 247, 0.15), transparent 70%);
-      }
-      .character-card[data-character="sigmatom"] img {
-        max-height: 120px;
-        object-fit: contain;
-        filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.4));
       }
 
       /* In-Game Combat Menu Terminal Overhaul */
@@ -2420,6 +2618,19 @@
             <div class="badge-tag" id="main-badge">FFA Tactical Arena</div>
             <h1 class="main-title" id="main-title">BABA <span>CYBORG</span></h1>
             <p class="main-desc" id="main-desc">High-octane arena combat. Dash into your line of fire, deflect projectile attacks, and dominate the server.</p>
+
+            <!-- Operative Callsign / Username Dock -->
+            <div class="callsign-dock">
+              <div class="callsign-header">
+                <span class="callsign-label">OPERATIVE CALLSIGN</span>
+                <span class="callsign-sync-tag" id="callsign-sync-tag">DISCORD CLOUD SYNC</span>
+              </div>
+              <div class="callsign-input-wrap">
+                <span class="callsign-hash">#</span>
+                <input type="text" id="username-input" class="callsign-input" maxlength="20" placeholder="Enter Call-sign..." spellcheck="false" autocomplete="off" />
+                <button type="button" id="btn-save-username" class="callsign-save-btn">SAVE</button>
+              </div>
+            </div>
           </div>
           <div class="menu-nav">
             <button id="play-button" class="btn btn-primary" disabled>Deploying…</button>
@@ -2451,67 +2662,130 @@
     <section id="character-screen" class="screen hidden">
       <div class="roster-container">
         <div class="roster-header">
-          <div>
+          <div class="roster-header-left">
             <div class="badge-tag">Chassis Hangar</div>
             <h2>Choose Your Fighter</h2>
           </div>
+          <div class="roster-tip">
+            <span class="tip-icon">⚡</span>
+            <span>Reach Level 10 (1000 XP) in-match to evolve or unlock hyper-forms</span>
+          </div>
         </div>
-        <div class="roster-grid">
-          <button class="character-card" data-character="granny">
-            <span class="portrait"><img id="granny-portrait" alt="Granny" /></span>
-            <span class="character-copy">
-              <h3>Granny</h3>
-              <p>Agile micro-frame with high maneuverability and low profile hitbox.</p>
-              <div class="stats">
-                <div class="stat">Speed <span class="meter"><i style="--value:92%"></i></span></div>
-                <div class="stat">Damage <span class="meter"><i style="--value:48%"></i></span></div>
-                <div class="stat">Profile <span class="meter"><i style="--value:30%"></i></span></div>
+
+        <div class="lineage-grid">
+          <!-- BABA CYBORG LINEAGE -->
+          <div class="lineage-column">
+            <div class="lineage-tag">
+              <span class="lineage-bullet"></span>
+              HEAVY ASSAULT LINEAGE
+            </div>
+
+            <!-- Base Form -->
+            <button type="button" class="character-card selected" data-character="cyborg" id="card-cyborg">
+              <div class="card-portrait-wrap">
+                <img id="cyborg-portrait" alt="Baba Cyborg" />
               </div>
-            </span>
-          </button>
-          <button class="character-card selected" data-character="cyborg">
-            <span class="portrait"><img id="cyborg-portrait" alt="Baba Cyborg" /></span>
-            <span class="character-copy">
-              <h3>Baba Cyborg</h3>
-              <p>Heavy assault chassis with devastating high-impact firepower.</p>
-              <div class="stats">
-                <div class="stat">Speed <span class="meter"><i style="--value:56%"></i></span></div>
-                <div class="stat">Damage <span class="meter"><i style="--value:90%"></i></span></div>
-                <div class="stat">Profile <span class="meter"><i style="--value:92%"></i></span></div>
+              <div class="card-details">
+                <div class="card-title-row">
+                  <span class="card-name">Baba Cyborg</span>
+                  <span class="base-badge">BASE</span>
+                </div>
+                <div class="card-ability-line">Heavy Juggernaut · High Caliber</div>
+                <div class="card-metrics">
+                  <span class="metric-pill">HP <strong>20</strong></span>
+                  <span class="metric-pill">SPEED <strong>175</strong></span>
+                  <span class="metric-pill">DMG <strong>HIGH</strong></span>
+                </div>
               </div>
-            </span>
-          </button>
-          <button class="character-card locked" data-character="mama_cyborg" id="card-mama_cyborg">
-            <span class="portrait"><img id="mama_cyborg-portrait" alt="Mama Cyborg" /></span>
-            <span class="character-copy">
-              <div class="card-head">
-                <h3>Mama Cyborg</h3>
-                <span class="lock-indicator" id="mama_cyborg-lock-indicator">🔒 LVL 10 (1000 XP)</span>
+            </button>
+
+            <!-- Evolution Branch Connector -->
+            <div class="evolution-branch">
+              <div class="evo-branch-line"></div>
+              <div class="evo-branch-pill">
+                <span class="evo-arrow">▼</span>
+                <span>EVOLVES AT LVL 10</span>
               </div>
-              <p>Hyper-velocity chassis with 2.5x Health & Space Deflect Shield. Fires high-speed Vector Plasma that splits into a T after 1 second.</p>
-              <div class="stats">
-                <div class="stat">Speed <span class="meter"><i style="--value:95%"></i></span></div>
-                <div class="stat">Damage <span class="meter"><i style="--value:82%"></i></span></div>
-                <div class="stat">Profile <span class="meter"><i style="--value:85%"></i></span></div>
+              <div class="evo-branch-line"></div>
+            </div>
+
+            <!-- Evolution Form (Anne Cyborg) -->
+            <button type="button" class="character-card locked" data-character="mama_cyborg" id="card-mama_cyborg">
+              <div class="card-portrait-wrap evo-portrait">
+                <img id="mama_cyborg-portrait" alt="Anne Cyborg" />
               </div>
-            </span>
-          </button>
-          <button class="character-card locked" data-character="angry_granny" id="card-angry_granny">
-            <span class="portrait"><img id="angry_granny-portrait" alt="Angry Granny" /></span>
-            <span class="character-copy">
-              <div class="card-head">
-                <h3>Angry Granny</h3>
-                <span class="lock-indicator" id="angry_granny-lock-indicator">🔒 LVL 10 (1000 XP)</span>
+              <div class="card-details">
+                <div class="card-title-row">
+                  <span class="card-name">Anne Cyborg</span>
+                  <span class="lock-indicator" id="mama_cyborg-lock-indicator">🔒 LVL 10</span>
+                </div>
+                <div class="card-ability-line">Hyper-Velocity · Space Shield · T-Split Plasma</div>
+                <div class="card-metrics">
+                  <span class="metric-pill evo-metric">HP <strong>50 (2.5x)</strong></span>
+                  <span class="metric-pill evo-metric">SPEED <strong>280</strong></span>
+                  <span class="metric-pill evo-metric">T-SPLIT</span>
+                </div>
               </div>
-              <p>Furious hyper-evolution with 2.5x Health & Space Deflect Shield. Fires high-speed Vector Needles that split into a T after 1 second.</p>
-              <div class="stats">
-                <div class="stat">Speed <span class="meter"><i style="--value:95%"></i></span></div>
-                <div class="stat">Damage <span class="meter"><i style="--value:82%"></i></span></div>
-                <div class="stat">Profile <span class="meter"><i style="--value:60%"></i></span></div>
+            </button>
+          </div>
+
+          <!-- GRANNY LINEAGE -->
+          <div class="lineage-column">
+            <div class="lineage-tag interceptor-tag">
+              <span class="lineage-bullet interceptor-bullet"></span>
+              SWIFT INTERCEPTOR LINEAGE
+            </div>
+
+            <!-- Base Form -->
+            <button type="button" class="character-card" data-character="granny" id="card-granny">
+              <div class="card-portrait-wrap">
+                <img id="granny-portrait" alt="Granny" />
               </div>
-            </span>
-          </button>
+              <div class="card-details">
+                <div class="card-title-row">
+                  <span class="card-name">Granny</span>
+                  <span class="base-badge">BASE</span>
+                </div>
+                <div class="card-ability-line">Swift Interceptor · Rapid Fire Needles</div>
+                <div class="card-metrics">
+                  <span class="metric-pill">HP <strong>20</strong></span>
+                  <span class="metric-pill">SPEED <strong>255</strong></span>
+                  <span class="metric-pill">MICRO-HITBOX</span>
+                </div>
+              </div>
+            </button>
+
+            <!-- Evolution Branch Connector -->
+            <div class="evolution-branch">
+              <div class="evo-branch-line"></div>
+              <div class="evo-branch-pill">
+                <span class="evo-arrow">▼</span>
+                <span>EVOLVES AT LVL 10</span>
+              </div>
+              <div class="evo-branch-line"></div>
+            </div>
+
+            <!-- Evolution Form (Angry Granny) -->
+            <button type="button" class="character-card locked" data-character="angry_granny" id="card-angry_granny">
+              <div class="card-portrait-wrap evo-portrait">
+                <img id="angry_granny-portrait" alt="Angry Granny" />
+              </div>
+              <div class="card-details">
+                <div class="card-title-row">
+                  <span class="card-name">Angry Granny</span>
+                  <span class="lock-indicator" id="angry_granny-lock-indicator">🔒 LVL 10</span>
+                </div>
+                <div class="card-ability-line">Hyper-Velocity · Space Shield · T-Split Needles</div>
+                <div class="card-metrics">
+                  <span class="metric-pill evo-metric">HP <strong>50 (2.5x)</strong></span>
+                  <span class="metric-pill evo-metric">SPEED <strong>280</strong></span>
+                  <span class="metric-pill evo-metric">T-SPLIT</span>
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
+
         <div class="roster-actions">
           <button id="character-back" class="btn">Back</button>
           <button id="character-confirm" class="btn btn-primary">Deploy Baba Cyborg</button>
@@ -2704,16 +2978,16 @@
       </div>
     </section>
 
-    <!-- MAMA CYBORG UNLOCK CELEBRATION MODAL -->
+    <!-- ANNE CYBORG UNLOCK CELEBRATION MODAL -->
     <div id="mama-unlock-modal" class="sigma-unlock-modal hidden">
       <div class="sigma-modal-backdrop"></div>
       <div class="sigma-modal-card surface">
         <div class="sigma-badge-pill">★ LEVEL 10 REWARD UNLOCKED ★</div>
         <div class="sigma-portrait-frame">
-          <img id="mama-unlock-portrait" src="" alt="Mama Cyborg" />
+          <img id="mama-unlock-portrait" src="" alt="Anne Cyborg" />
           <div class="sigma-glow-ring"></div>
         </div>
-        <h2 class="sigma-title" id="mama-unlock-title">MAMA CYBORG <span>UNLOCKED</span></h2>
+        <h2 class="sigma-title" id="mama-unlock-title">ANNE CYBORG <span>UNLOCKED</span></h2>
         <p class="sigma-quote" id="mama-unlock-quote">"Unmatched velocity and revolutionary T-Split Vector Plasma technology."</p>
         <div class="sigma-perks">
           <div class="sigma-perk">
@@ -2739,7 +3013,7 @@
           </div>
         </div>
         <div class="sigma-actions">
-          <button id="btn-equip-mama" class="btn btn-primary btn-glow" type="button">EQUIP MAMA CYBORG</button>
+          <button id="btn-equip-mama" class="btn btn-primary btn-glow" type="button">EQUIP ANNE CYBORG</button>
           <button id="btn-close-mama" class="btn" type="button">Continue Battle</button>
         </div>
       </div>

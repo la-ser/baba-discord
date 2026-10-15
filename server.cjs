@@ -915,8 +915,11 @@ app.use(
 app.get("/health", (req, res) => res.json({ ok: true, players: players.size }));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 io.use(async (socket, next) => {
-  const { accessToken, instanceId, guestName, mode } = socket.handshake.auth || {};
+  const { accessToken, instanceId, guestName, customName, mode } = socket.handshake.auth || {};
   const requestedMode = mode === "horde" ? "horde" : "ffa";
+  const validCustomName = (typeof customName === "string" && customName.trim().length > 0)
+    ? customName.trim().slice(0, 20)
+    : null;
   if (accessToken === "dev-token" || !accessToken || accessToken.startsWith("guest-")) {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const validGuest = (typeof guestName === "string" && /^Guest\d{4}$/.test(guestName))
@@ -924,7 +927,7 @@ io.use(async (socket, next) => {
       : `Guest${randomNum}`;
     socket.data.identity = {
       id: "guest-" + validGuest,
-      name: validGuest,
+      name: validCustomName || validGuest,
       instanceId: instanceId || "browser-arena",
       isGuest: true,
       mode: requestedMode,
@@ -949,7 +952,7 @@ io.use(async (socket, next) => {
     if (!user.id) return next(new Error("Invalid Discord user"));
     socket.data.identity = {
       id: user.id,
-      name: String(user.global_name || user.username || "Player").slice(0, 24),
+      name: validCustomName || String(user.global_name || user.username || "Player").slice(0, 20),
       instanceId,
       mode: requestedMode,
     };
@@ -1111,6 +1114,18 @@ io.on("connection", (socket) => {
     p.deadSince = 0;
     p.protectedUntil = Date.now() + SPAWN_PROTECTION;
     socket.emit("mode_switched", { mode: validMode, character: p.character });
+  });
+  socket.on("change_name", (rawName) => {
+    if (typeof rawName !== "string") return;
+    const cleanName = rawName.trim().slice(0, 20);
+    if (!cleanName) return;
+    p.name = cleanName;
+    const scores = roomScores.get(p.room);
+    if (scores && p.discordId) {
+      const scoreEntry = scores.get(p.discordId);
+      if (scoreEntry) scoreEntry.name = cleanName;
+    }
+    socket.emit("name_updated", cleanName);
   });
   socket.on("tom_aura", () => {
     const now = Date.now();
