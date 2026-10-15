@@ -62,7 +62,15 @@ function decodeRgbaPng(filePath) {
 }
 
 function createScaledMask(filePath, width, height, alphaThreshold = 32) {
-  const source = decodeRgbaPng(filePath);
+  let source;
+  try {
+    source = decodeRgbaPng(filePath);
+  } catch (err) {
+    console.warn(`[CollisionMask] Could not decode ${filePath} (${err.message}). Using solid bounding box mask fallback.`);
+    const solid = new Uint8Array(width * height);
+    solid.fill(1);
+    return { width, height, solid, minX: 0, maxX: width - 1, minY: 0, maxY: height - 1 };
+  }
   const solid = new Uint8Array(width * height);
   let minX = width;
   let maxX = 0;
