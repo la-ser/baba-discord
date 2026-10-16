@@ -291,6 +291,7 @@ const HORDE_CARDS = {
   // Ability Cards (Rare, Individual, Non-Stackable)
   ability_dash: {
     id: "ability_dash",
+    family: "ability",
     category: "ability",
     rarity: "rare",
     name: "Dash Thrusters",
@@ -302,6 +303,7 @@ const HORDE_CARDS = {
   },
   ability_dodge: {
     id: "ability_dodge",
+    family: "ability",
     category: "ability",
     rarity: "rare",
     name: "Tactical Dodge & Deflect",
@@ -313,6 +315,7 @@ const HORDE_CARDS = {
   },
   player_zoom: {
     id: "player_zoom",
+    family: "utility",
     category: "upgrade",
     rarity: "uncommon",
     name: "Tactical Zoom",
@@ -326,125 +329,135 @@ const HORDE_CARDS = {
   },
   weapon_damage: {
     id: "weapon_damage",
+    family: "damage",
     category: "upgrade",
     rarity: "common",
     name: "Plasma Overcharge",
-    desc: "+20% bullet damage (stacks).",
+    desc: "+15% bullet damage (stacks up to +100%).",
     icon: "⚡",
     faIcon: "fa-solid fa-bolt",
-    condition: () => true,
+    condition: (player) => (player.bonusDamageMult || 0) < 0.90,
     apply: (player) => {
-      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.20;
+      player.bonusDamageMult = Math.min(1.00, Math.round(((player.bonusDamageMult || 0) + 0.15) * 100) / 100);
     }
   },
   weapon_heavy_caliber: {
     id: "weapon_heavy_caliber",
+    family: "damage",
     category: "upgrade",
     rarity: "common",
     name: "High-Caliber Ordnance",
-    desc: "+15% bullet damage (stacks).",
+    desc: "+12% bullet damage (stacks up to +100%).",
     icon: "💥",
     faIcon: "fa-solid fa-burst",
-    condition: () => true,
+    condition: (player) => (player.bonusDamageMult || 0) < 0.90,
     apply: (player) => {
-      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.15;
+      player.bonusDamageMult = Math.min(1.00, Math.round(((player.bonusDamageMult || 0) + 0.12) * 100) / 100);
     }
   },
   weapon_piercing_core: {
     id: "weapon_piercing_core",
+    family: "damage",
     category: "upgrade",
     rarity: "uncommon",
     name: "Tungsten Penetrator",
-    desc: "+18% bullet damage (stacks).",
+    desc: "+18% bullet damage (stacks up to +100%).",
     icon: "🎯",
     faIcon: "fa-solid fa-bullseye",
-    condition: () => true,
+    condition: (player) => (player.bonusDamageMult || 0) < 0.85,
     apply: (player) => {
-      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.18;
+      player.bonusDamageMult = Math.min(1.00, Math.round(((player.bonusDamageMult || 0) + 0.18) * 100) / 100);
     }
   },
   weapon_hollow_point: {
     id: "weapon_hollow_point",
+    family: "damage",
     category: "upgrade",
     rarity: "rare",
     name: "Hyper-Charge Capacitors",
-    desc: "+25% bullet damage (stacks).",
+    desc: "+22% bullet damage (stacks up to +100%).",
     icon: "⚛️",
     faIcon: "fa-solid fa-atom",
-    condition: () => true,
+    condition: (player) => (player.bonusDamageMult || 0) < 0.80,
     apply: (player) => {
-      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.25;
+      player.bonusDamageMult = Math.min(1.00, Math.round(((player.bonusDamageMult || 0) + 0.22) * 100) / 100);
     }
   },
   weapon_rapid_fire: {
     id: "weapon_rapid_fire",
+    family: "fire_rate",
     category: "upgrade",
     rarity: "uncommon",
     name: "Hair Trigger",
-    desc: "+15% faster firing rate (stacks).",
+    desc: "+15% faster firing rate (stacks up to 2x speed).",
     icon: "🔫",
     faIcon: "fa-solid fa-gun",
-    condition: () => true,
+    condition: (player) => (player.fireRateMult || 1.0) > 0.55,
     apply: (player) => {
-      player.fireRateMult = (player.fireRateMult || 1.0) * 0.85;
+      player.fireRateMult = Math.max(0.50, Math.round(((player.fireRateMult || 1.0) * 0.85) * 1000) / 1000);
     }
   },
   weapon_overclock_actuator: {
     id: "weapon_overclock_actuator",
+    family: "fire_rate",
     category: "upgrade",
     rarity: "common",
     name: "Overclocked Actuator",
-    desc: "+12% faster firing rate (stacks).",
+    desc: "+12% faster firing rate (stacks up to 2x speed).",
     icon: "⚙️",
     faIcon: "fa-solid fa-gauge-high",
-    condition: () => true,
+    condition: (player) => (player.fireRateMult || 1.0) > 0.60,
     apply: (player) => {
-      player.fireRateMult = (player.fireRateMult || 1.0) * 0.88;
+      player.fireRateMult = Math.max(0.50, Math.round(((player.fireRateMult || 1.0) * 0.88) * 1000) / 1000);
     }
   },
   weapon_lightweight_bolt: {
     id: "weapon_lightweight_bolt",
+    family: "fire_rate",
     category: "upgrade",
     rarity: "common",
     name: "Lightweight Bolt",
-    desc: "+10% faster firing rate (stacks).",
+    desc: "+10% faster firing rate (stacks up to 2x speed).",
     icon: "💨",
     faIcon: "fa-solid fa-forward-fast",
-    condition: () => true,
+    condition: (player) => (player.fireRateMult || 1.0) > 0.60,
     apply: (player) => {
-      player.fireRateMult = (player.fireRateMult || 1.0) * 0.90;
+      player.fireRateMult = Math.max(0.50, Math.round(((player.fireRateMult || 1.0) * 0.90) * 1000) / 1000);
     }
   },
   weapon_twin_feed: {
     id: "weapon_twin_feed",
+    family: "fire_rate",
     category: "upgrade",
     rarity: "rare",
     name: "Twin-Feed Loader",
-    desc: "+20% faster firing rate (stacks).",
+    desc: "+18% faster firing rate (stacks up to 2x speed).",
     icon: "🔁",
     faIcon: "fa-solid fa-arrows-spin",
-    condition: () => true,
+    condition: (player) => (player.fireRateMult || 1.0) > 0.55,
     apply: (player) => {
-      player.fireRateMult = (player.fireRateMult || 1.0) * 0.80;
+      player.fireRateMult = Math.max(0.50, Math.round(((player.fireRateMult || 1.0) * 0.82) * 1000) / 1000);
     }
   },
 
   // Granny Utility Cards (Stackable team upgrades)
   granny_turret: {
     id: "granny_turret",
+    family: "granny_core",
     category: "utility",
     rarity: "common",
     name: "Granny Defense Cannon",
-    desc: "Granny statue auto-shoots nearby enemies. Stacks for faster fire rate.",
+    desc: "Granny statue auto-shoots nearby enemies (stacks up to Level 5).",
     icon: "🔱",
     faIcon: "fa-solid fa-crosshairs",
-    condition: (player, horde) => true,
+    condition: (player, horde) => (horde.grannyTurretLevel || 0) < 5,
     apply: (player, horde) => {
-      horde.grannyTurretLevel = (horde.grannyTurretLevel || 0) + 1;
+      horde.grannyTurretLevel = Math.min(5, (horde.grannyTurretLevel || 0) + 1);
     }
   },
   repair_all_structures: {
     id: "repair_all_structures",
+    family: "defense_mod",
     category: "upgrade",
     rarity: "rare",
     name: "Repair All Structures",
@@ -468,6 +481,7 @@ const HORDE_CARDS = {
   },
   granny_repair: {
     id: "granny_repair",
+    family: "granny_core",
     category: "utility",
     rarity: "common",
     name: "Core Repair",
@@ -481,21 +495,23 @@ const HORDE_CARDS = {
   },
   granny_heal_aura: {
     id: "granny_heal_aura",
+    family: "granny_core",
     category: "utility",
     rarity: "uncommon",
     name: "Healing Aura",
-    desc: "Heals players standing near Granny. Stacking increases heal amount and range.",
+    desc: "Heals players standing near Granny (stacks up to Level 5).",
     icon: "💚",
     faIcon: "fa-solid fa-heart-pulse",
-    condition: (player, horde) => true,
+    condition: (player, horde) => (horde.healAuraLevel || 0) < 5,
     apply: (player, horde) => {
-      horde.healAuraLevel = (horde.healAuraLevel || 0) + 1;
+      horde.healAuraLevel = Math.min(5, (horde.healAuraLevel || 0) + 1);
     }
   },
 
   // Object Placement Cards
   object_barricade: {
     id: "object_barricade",
+    family: "deployable",
     category: "object",
     rarity: "common",
     name: "Barricade",
@@ -510,6 +526,7 @@ const HORDE_CARDS = {
   },
   object_turret: {
     id: "object_turret",
+    family: "deployable",
     category: "object",
     rarity: "uncommon",
     name: "Sentry Turret",
@@ -524,6 +541,7 @@ const HORDE_CARDS = {
   },
   object_trap: {
     id: "object_trap",
+    family: "deployable",
     category: "object",
     rarity: "uncommon",
     name: "Freeze Trap",
@@ -540,54 +558,58 @@ const HORDE_CARDS = {
   // Object Upgrade Cards (ONLY appear when matching object is actually placed!)
   turret_range: {
     id: "turret_range",
+    family: "defense_mod",
     category: "upgrade",
     rarity: "common",
     name: "Turret Range",
-    desc: "+70px range for all sentry turrets.",
+    desc: "+50px range for all sentry turrets (stacks up to +200px).",
     icon: "🔭",
     faIcon: "fa-solid fa-satellite-dish",
-    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret") && (horde.turretRangeBoost || 0) < 200,
     apply: (player, horde) => {
-      horde.turretRangeBoost = (horde.turretRangeBoost || 0) + 70;
+      horde.turretRangeBoost = Math.min(200, (horde.turretRangeBoost || 0) + 50);
     }
   },
   turret_cooldown: {
     id: "turret_cooldown",
+    family: "defense_mod",
     category: "upgrade",
     rarity: "common",
     name: "Turret Fire Rate",
-    desc: "All sentry turrets shoot 25% faster.",
+    desc: "All sentry turrets shoot 18% faster (stacks up to 2x speed).",
     icon: "⚙️",
     faIcon: "fa-solid fa-gauge-high",
-    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret") && (horde.turretCooldownMult || 1.0) > 0.55,
     apply: (player, horde) => {
-      horde.turretCooldownMult = (horde.turretCooldownMult || 1.0) * 0.75;
+      horde.turretCooldownMult = Math.max(0.50, Math.round(((horde.turretCooldownMult || 1.0) * 0.82) * 1000) / 1000);
     }
   },
   turret_damage: {
     id: "turret_damage",
+    family: "defense_mod",
     category: "upgrade",
     rarity: "common",
     name: "Turret Damage",
-    desc: "+1.2 bullet damage for all sentry turrets.",
+    desc: "+0.8 bullet damage for all sentry turrets (stacks up to +2.4).",
     icon: "💥",
     faIcon: "fa-solid fa-burst",
-    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret") && (horde.turretDamageBoost || 0) < 2.4,
     apply: (player, horde) => {
-      horde.turretDamageBoost = (horde.turretDamageBoost || 0) + 1.2;
+      horde.turretDamageBoost = Math.min(2.4, Math.round(((horde.turretDamageBoost || 0) + 0.8) * 10) / 10);
     }
   },
   trap_cooldown: {
     id: "trap_cooldown",
+    family: "defense_mod",
     category: "upgrade",
     rarity: "common",
     name: "Trap Cooldown",
-    desc: "Reduces trap re-arm cooldown by 1.3s.",
+    desc: "Reduces trap re-arm cooldown by 1.0s (min 1.8s).",
     icon: "⏱️",
     faIcon: "fa-solid fa-clock-rotate-left",
-    condition: (player, horde) => horde.placedObjects.some(o => o.type === "trap"),
+    condition: (player, horde) => horde.placedObjects.some(o => o.type === "trap") && (horde.trapRecoveryTime || 5000) > 2000,
     apply: (player, horde) => {
-      horde.trapRecoveryTime = Math.max(1200, (horde.trapRecoveryTime || 5000) - 1300);
+      horde.trapRecoveryTime = Math.max(1800, (horde.trapRecoveryTime || 5000) - 1000);
     }
   }
 };
@@ -1771,32 +1793,49 @@ class HordeGame {
       if (!available.some(c => c.id === "object_trap")) available.push(HORDE_CARDS.object_trap);
     }
 
-    const pool = [];
-    for (const card of available) {
-      let weight = 10;
-      if (card.category === "ability") weight = 4;
-      else if (card.rarity === "uncommon") weight = 8;
-      for (let i = 0; i < weight; i++) pool.push(card);
-    }
-
     const chosen = [];
     const chosenIds = new Set();
-    while (chosen.length < 3 && pool.length > 0) {
-      const rand = pool[Math.floor(Math.random() * pool.length)];
-      if (!chosenIds.has(rand.id)) {
-        chosenIds.add(rand.id);
-        chosen.push({
-          id: rand.id,
-          category: rand.category,
-          rarity: rand.rarity,
-          name: rand.name,
-          desc: rand.desc,
-          icon: rand.icon,
-          faIcon: rand.faIcon,
-        });
+    const chosenFamilies = new Set();
+
+    const getCardWeight = (card) => {
+      if (card.category === "ability" || card.rarity === "rare") return 4;
+      if (card.rarity === "uncommon") return 7;
+      return 10;
+    };
+
+    // Draw up to 3 cards ensuring diversity: no duplicate sub-stat families (e.g. max 1 fire rate card per roll)
+    while (chosen.length < 3 && chosenIds.size < available.length) {
+      // Find candidate cards whose family has not yet been selected in this offering
+      let candidates = available.filter(c => !chosenIds.has(c.id) && !chosenFamilies.has(c.family || c.id));
+      // If all remaining candidates belong to already selected families, fallback to any unpicked card
+      if (candidates.length === 0) {
+        candidates = available.filter(c => !chosenIds.has(c.id));
       }
-      for (let i = pool.length - 1; i >= 0; i--) {
-        if (pool[i].id === rand.id) pool.splice(i, 1);
+      if (candidates.length === 0) break;
+
+      // Build weighted pool for this draw step
+      const stepPool = [];
+      for (const card of candidates) {
+        const weight = getCardWeight(card);
+        for (let i = 0; i < weight; i++) {
+          stepPool.push(card);
+        }
+      }
+
+      const picked = stepPool[Math.floor(Math.random() * stepPool.length)];
+      if (picked && !chosenIds.has(picked.id)) {
+        chosenIds.add(picked.id);
+        if (picked.family) chosenFamilies.add(picked.family);
+        chosen.push({
+          id: picked.id,
+          family: picked.family || picked.category,
+          category: picked.category,
+          rarity: picked.rarity,
+          name: picked.name,
+          desc: picked.desc,
+          icon: picked.icon,
+          faIcon: picked.faIcon,
+        });
       }
     }
     return chosen;
@@ -1822,9 +1861,9 @@ class HordeGame {
     let minSpacing = 42;
     let fallbackRings = [145, 185];
     if (type === "turret") {
-      ringRadius = 195;
-      minSpacing = 65;
-      fallbackRings = [195, 235];
+      ringRadius = 210;
+      minSpacing = 95;
+      fallbackRings = [210, 260];
     } else if (type === "trap") {
       ringRadius = 270;
       minSpacing = 85;
@@ -1871,7 +1910,7 @@ class HordeGame {
     }
 
     let turretType = "default";
-    let baseRadius = type === "barricade" ? 30 : (type === "turret" ? 22 : 60);
+    let baseRadius = type === "barricade" ? 30 : (type === "turret" ? 44 : 60);
     let baseHp = type === "barricade" ? 60 : (type === "turret" ? 28 : 100);
     let baseRange = 240;
     let baseCooldown = 750;
@@ -1882,7 +1921,7 @@ class HordeGame {
       turretType = pInv?.equippedTurret || player?.equippedTurret || "default";
       const cfg = TURRET_TYPES[turretType] || TURRET_TYPES.default;
       baseHp = Math.round(28 * (cfg.healthMultiplier || 1.0));
-      baseRadius = Math.round(22 * (cfg.sizeMultiplier || 1.0));
+      baseRadius = Math.round(44 * (cfg.sizeMultiplier || 1.0));
       baseRange = Math.round(240 * (cfg.rangeMultiplier || 1.0));
       baseCooldown = Math.round(750 * (cfg.cooldownMultiplier || 1.0));
       baseDamage = Math.round(2.2 * (cfg.damageMultiplier || 1.0) * 10) / 10;
@@ -3744,7 +3783,7 @@ io.on("connection", (socket) => {
 
     const isBarricade = type === "barricade" || type === "wall";
     let turretType = "default";
-    let baseRadius = isBarricade ? 30 : (type === "turret" ? 22 : 60);
+    let baseRadius = isBarricade ? 30 : (type === "turret" ? 44 : 60);
     let baseHp = isBarricade ? 60 : (type === "turret" ? 28 : 100);
     let baseRange = 240;
     let baseCooldown = 750;
@@ -3755,7 +3794,7 @@ io.on("connection", (socket) => {
       turretType = pInv?.equippedTurret || p?.equippedTurret || "default";
       const cfg = TURRET_TYPES[turretType] || TURRET_TYPES.default;
       baseHp = Math.round(28 * (cfg.healthMultiplier || 1.0));
-      baseRadius = Math.round(22 * (cfg.sizeMultiplier || 1.0));
+      baseRadius = Math.round(44 * (cfg.sizeMultiplier || 1.0));
       baseRange = Math.round(240 * (cfg.rangeMultiplier || 1.0));
       baseCooldown = Math.round(750 * (cfg.cooldownMultiplier || 1.0));
       baseDamage = Math.round(2.2 * (cfg.damageMultiplier || 1.0) * 10) / 10;
@@ -5670,6 +5709,10 @@ server.on("error", (err) => {
   console.error("Game server failed to listen:", err);
   process.exit(1);
 });
-server.listen(PORT, "0.0.0.0", () =>
-  console.log(`Discord Activity server ready at http://localhost:${PORT}`),
-);
+if (require.main === module) {
+  server.listen(PORT, "0.0.0.0", () =>
+    console.log(`Discord Activity server ready at http://localhost:${PORT}`),
+  );
+}
+
+module.exports = { HORDE_CARDS, HordeGame, server };

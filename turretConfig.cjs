@@ -86,7 +86,7 @@ const TURRET_TYPES = {
     sizeMultiplier: 1.0,     // 22px
     burstCount: 2,           // 2 bullets per burst
     burstDelay: 120,         // 0.12s between shots
-    barrelOffsets: [-7, 7],  // Visual left and right barrel offsets (pixels)
+    barrelOffsets: [-14, 14], // Visual left and right barrel offsets (pixels, 2x scaled)
     bulletType: "turret_double",
   },
   alien: {
@@ -129,7 +129,7 @@ const TURRET_TYPES = {
     sizeMultiplier: 1.0,     // 22px
     burstCount: 3,           // 3 bullets per burst
     burstDelay: 90,          // 0.09s between shots
-    barrelOffsets: [-8, 0, 8], // Visual offsets: Left, Center, Right
+    barrelOffsets: [-16, 0, 16], // Visual offsets: Left, Center, Right (2x scaled)
     bulletType: "turret_tripple",
   },
   gold: {
