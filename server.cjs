@@ -2429,10 +2429,10 @@ class HordeGame {
           if (enemy.slowedUntil && wallNow < enemy.slowedUntil) {
             moveSpeed *= 0.75;
           }
-          if (dist > minStopDist) {
-            enemy.x += nx * moveSpeed * dt;
-            enemy.y += ny * moveSpeed * dt;
-          }
+          // Match the 5px arrival threshold above and avoid overshooting a target.
+          const moveDistance = Math.min(moveSpeed * dt, dist - 5);
+          enemy.x += nx * moveDistance;
+          enemy.y += ny * moveDistance;
         }
       }
 
@@ -3358,6 +3358,7 @@ app.get("/health", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.json({ ok: true, players: players.size, build: clientBuild, processId: process.pid });
 });
+app.get("/favicon.ico", (req, res) => res.redirect(302, "/favicon.svg"));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 io.use(async (socket, next) => {
   const { accessToken, instanceId, guestName, customName, mode } = socket.handshake.auth || {};

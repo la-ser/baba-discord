@@ -51,3 +51,5 @@ For the current Pi setup, set PORT=2323 in the deployed .env and target http://1
 Run node scripts/diagnose-connection.cjs on the Pi to compare local and public HTTP, polling sessions and WebSocket stability. If only the public target fails, inspect cloudflared logs at the same time; a 502 alone does not establish a bandwidth bottleneck.
 
 If WebSockets connect then drop, the browser now falls back to polling for the remainder of that page session. This also prevents repeated WebSocket upgrade attempts. Server transport errors are logged with [transport handshake] / [transport closed] without authentication payloads. Code 1006 means the WebSocket ended without a close frame; it does not establish the underlying cause.
+
+The multiplayer test suite also runs an 18-second Horde/FFA stability check with real enemy spawning and movement. It covers the undefined minStopDist crash that previously caused PM2 restarts and browser 502/reconnect loops. Enemy movement now uses the existing 5px arrival threshold and clamps its step to avoid overshooting.
