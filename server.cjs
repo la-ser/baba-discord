@@ -3742,6 +3742,7 @@ io.on("connection", (socket) => {
     if (idx === -1) return;
     p.pendingPlacements.splice(idx, 1);
 
+    const isBarricade = type === "barricade" || type === "wall";
     let turretType = "default";
     let baseRadius = isBarricade ? 30 : (type === "turret" ? 22 : 60);
     let baseHp = isBarricade ? 60 : (type === "turret" ? 28 : 100);
