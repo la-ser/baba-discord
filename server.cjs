@@ -169,7 +169,7 @@ const ENEMY_CONFIG = {
     speed: 240,
     damage: 1.8,
     maxHp: 1,
-    xp: 20,
+    xp: 8,
     hasDodge: false,
     isSplitChild: true,
   },
@@ -183,7 +183,7 @@ const ENEMY_CONFIG = {
     speed: 240,
     damage: 1.8,
     maxHp: 1,
-    xp: 20,
+    xp: 8,
     hasDodge: false,
     isSplitChild: true,
   },
@@ -608,12 +608,15 @@ class HordeGame {
     const x = ARENA_CENTER.x + Math.cos(angle) * spawnDist;
     const y = ARENA_CENTER.y + Math.sin(angle) * spawnDist;
 
-    // In Wave 1, all enemies have 1 HP (one-hit kill!)
-    // In Wave 2, 2 HP.
-    // In Wave 3+, scales smoothly with wave and enemy base tier
+    // Continuous wave progression and multi-player health balancing:
+    // Wave 1: 1 HP (warmup). Wave 2: 2 HP.
+    // Wave 3+: smooth uncapped wave progression (wave 10: ~1.08x, wave 20: ~1.83x, wave 30: ~2.58x)
+    // Co-op multiplier (+40% HP per additional player) so multi-player teams require coordinated teamwork
     let hp;
     let speed;
     let damage;
+    const coOpHpMult = 1.0 + (Math.max(1, activePlayerCount) - 1) * 0.40;
+
     if (this.wave === 1) {
       hp = 1;
       speed = Math.min(105, config.speed * 0.62);
@@ -623,14 +626,14 @@ class HordeGame {
       speed = Math.min(125, config.speed * 0.76);
       damage = 1.4;
     } else if (this.wave === 3) {
-      hp = Math.max(2, Math.round(config.maxHp * 0.45));
+      hp = Math.max(3, Math.round(config.maxHp * 0.50 * coOpHpMult));
       speed = config.speed * 0.88;
       damage = Math.max(1.5, config.damage * 0.75);
     } else {
-      const waveProgress = Math.min(1.80, 0.45 + (this.wave - 3) * 0.09);
-      hp = Math.max(3, Math.round(config.maxHp * waveProgress));
+      const waveProgress = 0.55 + (this.wave - 3) * 0.075;
+      hp = Math.max(3, Math.round(config.maxHp * waveProgress * coOpHpMult));
       speed = config.speed;
-      damage = config.damage;
+      damage = Math.round((config.damage * (1 + Math.min(1.2, (this.wave - 1) * 0.035))) * 10) / 10;
     }
 
     this.enemies.push({
@@ -721,8 +724,8 @@ class HordeGame {
         radius: cfg.radius,
         speed: cfg.speed, // Fast speed: 240
         damage: cfg.damage,
-        maxHp: 1, // 1-hit kill
-        hp: 1,
+        maxHp: Math.max(1, Math.min(3, 1 + Math.floor((this.wave - 1) / 12))),
+        hp: Math.max(1, Math.min(3, 1 + Math.floor((this.wave - 1) / 12))),
         xp: cfg.xp,
         hasDodge: false,
         dodgeCooldown: 4000,
@@ -835,11 +838,12 @@ class HordeGame {
       .filter(p => p && p.active && p.health > 0);
 
     const findClosestTarget = () => {
-      // Prioritize active players first!
-      if (activePlayers.length > 0) {
+      // Prioritize active players first (ignore players with invincible respawn bubble!)
+      const targetablePlayers = activePlayers.filter(p => !p.protectedUntil || p.protectedUntil <= wallNow);
+      if (targetablePlayers.length > 0) {
         let closestPlayer = null;
         let closestDist = Infinity;
-        for (const p of activePlayers) {
+        for (const p of targetablePlayers) {
           const d = Math.hypot(this.boss.x - p.x, this.boss.y - p.y);
           if (d < closestDist) {
             closestDist = d;
@@ -1033,12 +1037,13 @@ class HordeGame {
     }
 
     // 4. Stomp Attack Trigger (Phase 3 & Phase 4: every 8-10 seconds)
+    const stompCandidates = activePlayers.filter(p => !p.protectedUntil || p.protectedUntil <= wallNow);
     if ((this.boss.phase === "phase3" || this.boss.phase === "phase4") &&
         this.boss.stompState === "ready" &&
         !this.boss.chargingBarrage &&
         wallNow >= this.boss.stompTimer &&
-        activePlayers.length > 0) {
-      const targetP = activePlayers[Math.floor(Math.random() * activePlayers.length)];
+        stompCandidates.length > 0) {
+      const targetP = stompCandidates[Math.floor(Math.random() * stompCandidates.length)];
       this.boss.stompTarget = { x: targetP.x, y: targetP.y };
       this.boss.stompState = "stunned_charge";
       this.boss.stompChargeUntil = wallNow + 2000;
@@ -1077,6 +1082,7 @@ class HordeGame {
         if (!bomb.exploded && wallNow >= bomb.landAt) {
           bomb.exploded = true;
           for (const p of activePlayers) {
+            if (p.protectedUntil && p.protectedUntil > wallNow) continue;
             const d = Math.hypot(p.x - bomb.x, p.y - bomb.y);
             if (d <= 95) {
               const dmg = 5.5;
@@ -1170,6 +1176,7 @@ class HordeGame {
 
     // Melee contact crushing damage to close players
     for (const p of activePlayers) {
+      if (p.protectedUntil && p.protectedUntil > wallNow) continue;
       const pDist = Math.hypot(p.x - this.boss.x, p.y - this.boss.y);
       const pRadius = characterRadius(p.character);
       if (pDist <= this.boss.radius + pRadius) {
@@ -1711,7 +1718,7 @@ class HordeGame {
 
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
-          if (!p || !p.active || p.health <= 0) continue;
+          if (!p || !p.active || p.health <= 0 || (p.protectedUntil && p.protectedUntil > wallNow)) continue;
           const d = Math.hypot(p.x - enemy.x, p.y - enemy.y);
           if (d < closestPlayerDist) {
             closestPlayerDist = d;
@@ -1834,7 +1841,7 @@ class HordeGame {
           if (enemy.lastParryHits.get(p.id) !== p.parryId) {
             enemy.lastParryHits.set(p.id, p.parryId);
             const dmgMult = getPlayerDamageMultiplier(p);
-            const deflectDmg = Math.round((3.6 + (p.level || 1) * 0.22) * dmgMult * 10) / 10;
+            const deflectDmg = Math.round((3.2 + (p.level || 1) * 0.12) * dmgMult * 10) / 10;
             const pushX = (enemy.x - p.x) / (pDist || 1);
             const pushY = (enemy.y - p.y) / (pDist || 1);
             enemy.x += pushX * 36;
@@ -1879,7 +1886,7 @@ class HordeGame {
           if (enemy.lastDodgeHits.get(p.id) !== p.dodgeId) {
             enemy.lastDodgeHits.set(p.id, p.dodgeId);
             const dmgMult = getPlayerDamageMultiplier(p);
-            const dodgeDmg = Math.round((2.5 + (p.level || 1) * 0.16) * dmgMult * 10) / 10;
+            const dodgeDmg = Math.round((2.2 + (p.level || 1) * 0.08) * dmgMult * 10) / 10;
             const dX = p.dodgeDirection?.x || ((enemy.x - p.x) / (pDist || 1));
             const dY = p.dodgeDirection?.y || ((enemy.y - p.y) / (pDist || 1));
             enemy.x += dX * 24;
@@ -1924,7 +1931,7 @@ class HordeGame {
           if (enemy.lastDashHits.get(p.id) !== p.dashId) {
             enemy.lastDashHits.set(p.id, p.dashId);
             const dmgMult = getPlayerDamageMultiplier(p);
-            const dashDmg = Math.round((3.2 + (p.level || 1) * 0.22) * dmgMult * 10) / 10;
+            const dashDmg = Math.round((2.8 + (p.level || 1) * 0.10) * dmgMult * 10) / 10;
             const dX = p.dashDirection?.x || ((enemy.x - p.x) / (pDist || 1));
             const dY = p.dashDirection?.y || ((enemy.y - p.y) / (pDist || 1));
             enemy.x += dX * 24;
@@ -2178,8 +2185,8 @@ function getPlayerDamageMultiplier(player) {
   if (!player) return 1.0;
   const isHorde = player.mode === "horde" || (player.room && player.room.endsWith(":horde"));
   if (isHorde) {
-    // Operative weapon & ability damage scales +5.5% per level above 1 plus card bonuses
-    const levelBonus = (Math.max(1, player.level || 1) - 1) * 0.055;
+    // Operative weapon & ability damage scales +2.5% per level above 1 plus card bonuses
+    const levelBonus = (Math.max(1, player.level || 1) - 1) * 0.025;
     const cardBonus = player.bonusDamageMult || 0;
     return 1 + levelBonus + cardBonus;
   }
@@ -2308,9 +2315,7 @@ function respawnObject(room, type) {
 const LEVEL_XP_THRESHOLDS = [0];
 let runningXpThreshold = 0;
 for (let lvl = 2; lvl <= 100; lvl++) {
-  // Balanced progression: early levels feel earned (Level 2 takes 120 XP, ~wave 1 end),
-  // reaching ~Level 12 by Wave 10, and scaling steadily up to ~200k total XP at Level 100.
-  const delta = 120 + (lvl - 2) * 40;
+  const delta = Math.round(180 + Math.pow(lvl - 1, 1.82) * 55);
   runningXpThreshold += delta;
   LEVEL_XP_THRESHOLDS.push(runningXpThreshold);
 }
@@ -3377,8 +3382,14 @@ function awardXp(player, amount, shareAssist = false) {
 
   // Co-op assist XP: distribute fair assist rewards to active teammates in Horde mode
   if (shareAssist && isHorde && player.room) {
-    const roomPids = rooms.get(player.room) || [];
-    const assistXp = Math.max(1, Math.round(amount * 0.45));
+    const roomPids = Array.from(rooms.get(player.room) || []).filter(pid => {
+      const pl = players.get(pid);
+      return pl && pl.active;
+    });
+    const teamCount = roomPids.length;
+    // Scale assist percentage so total team XP earned per player mirrors solo progression
+    const assistRatio = teamCount > 1 ? Math.min(0.35, 0.50 / (teamCount - 0.5)) : 0;
+    const assistXp = Math.max(1, Math.round(amount * assistRatio));
     for (const pid of roomPids) {
       if (pid !== player.id) {
         const teammate = players.get(pid);
@@ -4061,7 +4072,7 @@ setInterval(() => {
                 const killer = players.get(bullet.ownerId);
                 if (killer) {
                   killer.score.kills = (killer.score.kills || 0) + 1;
-                  awardXp(killer, 120, true);
+                  awardXp(killer, 120, false);
                 }
                 for (const pid of roomPlayers) {
                   const pl = players.get(pid);
@@ -4114,7 +4125,7 @@ setInterval(() => {
                 const killer = players.get(bullet.ownerId);
                 if (killer) {
                   killer.score.kills = (killer.score.kills || 0) + 1;
-                  awardXp(killer, 1500, true);
+                  awardXp(killer, 1500, false);
                 }
                 for (const pid of roomPlayers) {
                   const pl = players.get(pid);
