@@ -3334,7 +3334,14 @@ app.use(
     },
   }),
 );
-app.get("/health", (req, res) => res.json({ ok: true, players: players.size }));
+let clientBuild = null;
+try {
+  clientBuild = require("fs").readFileSync(path.join(__dirname, "dist", "index.html"), "utf8").match(/src="([^" ]+\.js)"/)?.[1] || null;
+} catch {}
+app.get("/health", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ ok: true, players: players.size, build: clientBuild, processId: process.pid });
+});
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 io.use(async (socket, next) => {
   const { accessToken, instanceId, guestName, customName, mode } = socket.handshake.auth || {};

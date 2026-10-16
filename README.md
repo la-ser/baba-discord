@@ -1,75 +1,51 @@
-# Baba Cyborg - Discord Activity Server
+# Baba Cyborg Discord Voice Channel Activity
 
-Production deployment repository for the Baba Cyborg Discord Voice Channel Activity.
+## Windows 11 installation
 
-Contains the pre-built client (`dist/`) and the Node.js Socket.IO server (`server.cjs`).
+1. Install Node.js 20.19+ or 22.12+ (Vite 6 compatible).
+2. Extract this folder. In PowerShell inside it, run `npm install`.
+3. Copy `.env.example` to `.env` with `Copy-Item .env.example .env`.
+4. In `.env`, set `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` from the Discord Developer Portal.
+5. In Discord Developer Portal, enable Activities and set the Activity URL mapping prefix `/` to `timber.klarapp.com` (without https://). Configure your development/test access in Discord.
+6. Run `npm run build` then `npm start`. After changing the game, rebuild and restart the server so the Activity serves the updated files; reload the Activity in Discord.
+7. Keep your existing Cloudflare Tunnel hostname `timber.klarapp.com` pointing to `http://localhost:8080`.
+8. Join a Discord voice channel, launch the development Activity, and have a second person join that **same running Activity**.
 
----
+Test `http://localhost:8080/health` or `https://timber.klarapp.com/health` for server health. Opening the game in a regular browser is intentionally not supported: it needs Discord's embedded SDK environment.
 
-## Requirements
+## Notes
 
-- Node.js 20.x or 22.x
-- npm or pnpm
-- (Optional) PM2 for process management
+- Every Discord Activity `instanceId` gets its own Socket.IO room. This is not a list of all voice channel members; only users who opened the Activity appear.
+- The main menu includes character selection and persistent music/sound settings. `TEMP/sound/theme.mp3` is used as the looping theme.
+- **Granny** is small and fast, dealing 1 heart per shot. **Baba Cyborg** is large and slower, dealing 2.25 hearts per shot. Aim with the mouse, fire with **E**, dash with **Space**, and press **R** to deflect incoming shots. Deflecting draws an energy barrier around you as you spin, reflecting shots back at enemies with boosted speed and damage. Dashing features smooth ease-out physics, ghost afterimage trails, and a 2.5-second cooldown. Collision is automatically calculated pixel-by-pixel from the character PNGs so transparent image margins never register as hits. The game also contains an unlisted keyboard-activated secret mode.
+- FFA players receive a server-enforced five-second spawn shield on initial spawn and every respawn. Firing immediately ends the shield.
+- The FFA arena is 2400×1350 with a camera-followed 800×450 viewport. The minimap shows the full arena and marks the current kill leader. Kills, deaths, K/D, and the server-room leaderboard last until that Activity room empties.
+- Multiplayer uses sequenced, droppable snapshots with buffered interpolation for remote players, local movement prediction with gentle server reconciliation, periodic server-clock synchronization, and reliable timestamped spin events. This prevents stale network frames from causing movement or emote jitter.
+- Background images cycle through the images in `TEMP/backround`.
+- Background PNGs are kept in `TEMP/backround` as originals; their optimized, small JPEG runtime copies are in `src/assets/backgrounds` so they load reliably through Discord's Activity proxy.
+- The server verifies each player's Discord OAuth access token against `/users/@me` and enforces movement bounds.
+- **Prototype trust limitation:** the room ID comes from the SDK client and is not independently attested by Discord on the server. A malicious authenticated client could claim another known instance ID. Before public deployment, implement stronger instance membership validation or a server-issued room authorization mechanism as supported by Discord's current APIs.
+- OAuth tokens are used only for the connection and are not persisted; use HTTPS through Cloudflare.
+- Do not commit or share `.env` or your Discord client secret.
+- If port 8080 is occupied, stop the old Node process before running this project.
+- Discord SDK / developer portal flows change over time; consult https://discord.com/developers/docs/activities/overview if authorization settings differ.
 
----
+## Connection verification
 
-## Server Setup & Deployment
+Run `npm run build` and `npm test` to check WebSocket and polling connections, movement between two clients, room isolation, stale input rejection, reconnects, and production image URLs. Run `npm start` for production; Vite development proxies API and Socket.IO requests to the configured server port. PORT in the project .env takes precedence over a PORT inherited from PM2 or the hosting environment. When .env has no PORT, the process environment is used, then 8080 as a fallback. Invalid port values stop startup with a clear error.
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/la-ser/baba-discord.git
-cd baba-discord
-```
+The client tries WebSocket first with polling fallback. Reverse proxies must forward both HTTP requests and WebSocket upgrades for /socket.io/ to the same running Node server. A public 502 requires checking the hosting process/tunnel target and /health; a browser transport setting cannot repair an unavailable upstream. Deploy the rebuilt dist folder together with server.cjs, server-port.cjs and its existing configuration/storage modules, then restart the service.
 
-### 2. Install production dependencies
-```bash
-npm install --omit=dev
-```
+## PM2 and port conflicts
 
-### 3. Configure environment variables
-Create a `.env` file in the root directory:
-```bash
-cp .env.example .env
-```
-Fill in your credentials:
-```env
-DISCORD_CLIENT_ID=your_discord_client_id
-DISCORD_CLIENT_SECRET=your_discord_client_secret
-PORT=8080
-```
+Run this game as one fork-mode process using ecosystem.config.js: rooms and simulation live in process memory. Replace the existing cluster-mode PM2 entry with this configuration; starting it alongside an old game entry will still conflict. Configure PORT in the .env beside server.cjs and point the reverse proxy/tunnel at that same port. A port conflict exits with code 78 and this PM2 configuration stops retrying it. Inspect the existing listener before stopping any process.
 
-### 4. Run the server
+Image requests retry transient failures three times. The base scientist sprite is bundled for fallback while tier images load; unavailable decorative backgrounds keep the last successfully loaded background and do not overwrite connection status.
 
-#### Direct execution:
-```bash
-npm start
-```
+## Raspberry Pi update
 
-#### With PM2 (Recommended for servers):
-```bash
-npm install -g pm2
-pm2 start ecosystem.config.cjs
-pm2 save
-pm2 startup
-```
+The deployment updater uses the canonical PM2 name Baba-Cyborg-DC. It deletes PM2 entries only when their resolved script path matches this checkout's server.cjs, then starts ecosystem.config.js in fork mode. This replaces older cluster settings and duplicate names without stopping other projects. It verifies the process ID, build ID, configured port and online state before saving PM2. Existing .env values are preserved.
 
----
+For the current Pi setup, set PORT=2323 in the deployed .env and target http://127.0.0.1:2323 from cloudflared. Run bash update.sh from the deployed repository after pushing the updated deployment bundle. The /health response reports build and processId for deployment verification and disables caching.
 
-## Updating the Server
-
-When updates are pushed to this repo, update your server simply by running:
-```bash
-./update.sh
-```
-This pulls the latest Git commits, installs dependencies, and restarts (or starts) `Baba-Cyborg-DC` in PM2.
-
----
-
-## Health Check
-
-Check that the server is running and responding:
-```bash
-curl http://localhost:8080/health
-# Output: {"ok":true,"players":0}
-```
+Run node scripts/diagnose-connection.cjs on the Pi to compare local and public HTTP, polling sessions and WebSocket stability. If only the public target fails, inspect cloudflared logs at the same time; a 502 alone does not establish a bandwidth bottleneck.

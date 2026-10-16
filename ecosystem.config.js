@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "Baba-Cyborg",
+    name: "Baba-Cyborg-DC",
     cwd: __dirname,
     script: "server.cjs",
     exec_mode: "fork",
