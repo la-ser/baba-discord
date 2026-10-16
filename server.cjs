@@ -3393,7 +3393,14 @@ io.on("connection", (socket) => {
   } else {
     playerInv = getGuestInventory(socket.id);
   }
-  const currentMode = initialMode === "horde" ? "horde" : "ffa";
+  let currentMode = initialMode === "horde" ? "horde" : "ffa";
+  const hordeRoom = `activity:${instanceId}:horde`;
+  const ffaRoom = `activity:${instanceId}:ffa`;
+  const hordeActiveCount = [...(rooms.get(hordeRoom) || [])].length;
+  const ffaActiveCount = [...(rooms.get(ffaRoom) || [])].length;
+  if (initialMode !== "horde" && hordeActiveCount > 0 && ffaActiveCount === 0) {
+    currentMode = "horde";
+  }
   const room = `activity:${instanceId}:${currentMode}`;
   socket.join(room);
   if (currentMode === "horde") {
@@ -5501,6 +5508,8 @@ setInterval(() => {
         hasDash: p.hasDash === true,
         hasDodge: p.hasDodge === true,
         zoomLevel: p.zoomLevel || 0,
+        fireRateMult: p.fireRateMult || 1.0,
+        bonusDamageMult: p.bonusDamageMult || 0,
         stunnedUntil: p.stunnedUntil || 0,
       }));
     const leaderboard = [...(roomScores.get(room)?.values() || [])]
