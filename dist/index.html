@@ -2441,6 +2441,194 @@
         font-weight: 800;
       }
 
+      /* Boss Health Bar (Top Center) */
+      #boss-hud {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 25;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        width: 480px;
+        max-width: 90vw;
+        padding: 8px 18px;
+        background: rgba(8, 12, 22, 0.95);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1.5px solid rgba(255, 51, 75, 0.55);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 51, 75, 0.25);
+        pointer-events: none;
+        transition: border-color 0.3s, box-shadow 0.3s;
+      }
+      #boss-hud.hidden {
+        display: none !important;
+      }
+      #boss-hud.is-angry {
+        border-color: rgba(255, 51, 75, 0.95);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 51, 75, 0.55);
+      }
+      #boss-hud:not(.hidden) ~ #horde-hud {
+        top: 68px;
+      }
+      .boss-bar-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .boss-title-wrap {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .boss-crown-icon {
+        font-size: 16px;
+        filter: drop-shadow(0 0 6px #ffbe1a);
+      }
+      .boss-name {
+        font-family: var(--font-display, system-ui);
+        font-weight: 950;
+        font-size: 15px;
+        letter-spacing: 2px;
+        color: #ffffff;
+        text-shadow: 0 0 10px rgba(255, 51, 75, 0.8);
+      }
+      .boss-subtitle {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        color: var(--accent-gold);
+      }
+      .boss-status-badges {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .boss-badge.invincible {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 900;
+        color: #38bdf8;
+        background: rgba(56, 189, 248, 0.2);
+        border: 1px solid rgba(56, 189, 248, 0.6);
+        border-radius: 4px;
+        padding: 2px 7px;
+        text-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+        animation: pulseBadge 0.8s infinite alternate ease-in-out;
+      }
+      .boss-badge.hidden {
+        display: none !important;
+      }
+      .boss-hp-readout {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 900;
+        color: #e2e8f0;
+      }
+      .boss-hp-track {
+        position: relative;
+        width: 100%;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .boss-hp-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ff334b, #ff7b00);
+        box-shadow: 0 0 10px rgba(255, 51, 75, 0.7);
+        transition: width 0.15s ease-out;
+      }
+      .boss-hp-fill.invincible {
+        background: linear-gradient(90deg, #0284c7, #38bdf8);
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+      }
+      .boss-phase-notch {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.35);
+        z-index: 2;
+      }
+
+      /* Boss Announcement Video Overlay */
+      #boss-announcement-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(3, 6, 12, 0.88);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        pointer-events: none;
+        transition: opacity 0.5s ease;
+      }
+      #boss-announcement-overlay.hidden {
+        display: none !important;
+      }
+      .boss-announcement-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        animation: bossCardPop 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      @keyframes bossCardPop {
+        0% { transform: scale(0.85); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .boss-announcement-nametag {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .boss-nametag-prefix {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 3px;
+        color: #ff334b;
+        text-shadow: 0 0 12px rgba(255, 51, 75, 0.9);
+      }
+      .boss-nametag-title {
+        font-family: var(--font-display, system-ui);
+        font-size: 44px;
+        font-weight: 950;
+        letter-spacing: 4px;
+        color: #ffffff;
+        margin: 0;
+        text-shadow: 0 0 24px rgba(255, 51, 75, 0.9), 0 0 48px rgba(255, 190, 26, 0.5);
+      }
+      .boss-nametag-sub {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        color: var(--accent-gold);
+        text-transform: uppercase;
+      }
+      .boss-video-frame {
+        width: 480px;
+        height: 270px;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 2px solid rgba(255, 51, 75, 0.7);
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 32px rgba(255, 51, 75, 0.45);
+        background: #000;
+      }
+      #boss-announcement-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
       /* Horde Center Announcement */
       #horde-announcement {
         position: absolute;
@@ -3329,7 +3517,7 @@
         color: #fff;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CKMguMMM.js"></script>
+    <script type="module" crossorigin src="/assets/index-Cc8lN1DC.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -3373,6 +3561,40 @@
           <div class="stat-item"><span class="stat-lbl">DEATHS</span><strong id="deaths-value">0</strong></div>
           <div class="stat-divider"></div>
           <div class="stat-item"><span class="stat-lbl">K/D</span><strong id="kd-value">0.0</strong></div>
+        </div>
+
+        <!-- Boss Health Bar (Top Center) -->
+        <div id="boss-hud" class="hidden">
+          <div class="boss-bar-head">
+            <div class="boss-title-wrap">
+              <span class="boss-crown-icon">👑</span>
+              <span class="boss-name" id="boss-name">3x T</span>
+              <span class="boss-subtitle" id="boss-subtitle">TITAN SUPREME</span>
+            </div>
+            <div class="boss-status-badges">
+              <span id="boss-invincible-badge" class="boss-badge invincible hidden"><i class="fa-solid fa-shield-halved"></i> INVINCIBLE</span>
+              <span class="boss-hp-readout" id="boss-hp-readout">350 / 350 HP</span>
+            </div>
+          </div>
+          <div class="boss-hp-track">
+            <div id="boss-hp-fill" class="boss-hp-fill" style="width: 100%;"></div>
+            <div class="boss-phase-notch" style="left: 66.66%;"></div>
+            <div class="boss-phase-notch" style="left: 50%;"></div>
+          </div>
+        </div>
+
+        <!-- Boss Announcement Video & Intro Overlay -->
+        <div id="boss-announcement-overlay" class="hidden">
+          <div class="boss-announcement-card">
+            <div class="boss-announcement-nametag">
+              <span class="boss-nametag-prefix">⚠️ THREAT LEVEL MAXIMUM ⚠️</span>
+              <h1 class="boss-nametag-title">3x T</h1>
+              <span class="boss-nametag-sub">THE ANCIENT SAHUR CONQUEROR</span>
+            </div>
+            <div class="boss-video-frame">
+              <video id="boss-announcement-video" playsinline preload="auto"></video>
+            </div>
+          </div>
         </div>
 
         <!-- Top Center Horde Status Bar -->
