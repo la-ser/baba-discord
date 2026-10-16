@@ -31,13 +31,15 @@ let gifts = [];
 function atomicWriteJson(filePath, data) {
   const tmpPath = `${filePath}.${Date.now()}.${Math.floor(Math.random() * 100000)}.tmp`;
   try {
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf8");
+    const fd = fs.openSync(tmpPath, "wx", 0o600);
+    try { fs.writeFileSync(fd, JSON.stringify(data, null, 2), "utf8"); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
     console.error(`[Storage] Failed atomic write to ${filePath}:`, err);
     try {
       if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
     } catch (_) {}
+    throw err;
   }
 }
 
@@ -48,13 +50,14 @@ function loadInventories() {
     try {
       const raw = fs.readFileSync(INVENTORIES_FILE, "utf8");
       const parsed = JSON.parse(raw);
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("Invalid inventory file structure");
       if (typeof parsed === "object" && parsed !== null) {
         for (const [id, inv] of Object.entries(parsed)) {
           inventories.set(id, sanitizeInventory(id, inv));
         }
       }
     } catch (e) {
-      console.error("[Storage] Error loading inventories.json:", e);
+      throw new Error("Refusing to overwrite unreadable inventories.json", { cause: e });
     }
   }
 }
@@ -66,11 +69,12 @@ function loadGifts() {
     try {
       const raw = fs.readFileSync(GIFTS_FILE, "utf8");
       const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) throw new Error("Invalid gift file structure");
       if (Array.isArray(parsed)) {
         gifts = parsed;
       }
     } catch (e) {
-      console.error("[Storage] Error loading gifts.json:", e);
+      throw new Error("Refusing to overwrite unreadable gifts.json", { cause: e });
     }
   }
 }
@@ -104,6 +108,7 @@ function sanitizeInventory(discordId, data = {}) {
     equippedTurret: equipped,
     caseHistory: Array.isArray(data.caseHistory) ? data.caseHistory.slice(-100) : [],
     starterKeyGranted: data.starterKeyGranted === true,
+    claimedGiftIds: Array.isArray(data.claimedGiftIds) ? data.claimedGiftIds.filter(id => typeof id === "string") : [],
     updatedAt: data.updatedAt || Date.now(),
   };
 }
@@ -137,12 +142,15 @@ function getInventory(discordId) {
  * Open a Turret Weapon Case for a Discord user
  * Server authoritative, cryptographically secure randomness.
  */
-function openTurretCase(discordId) {
+function openTurretCase(discordId, requestId) {
   const inv = getInventory(discordId);
   if (!inv) {
     return { success: false, error: "Player inventory not found" };
   }
 
+  if (requestId !== undefined && (typeof requestId !== "string" || !/^[a-zA-Z0-9_-]{16,80}$/.test(requestId))) return { success: false, error: "Invalid case request ID." };
+  const previous = requestId && inv.caseHistory.find(roll => roll.requestId === requestId);
+  if (previous) return { success: true, requestId, winningTurretId: previous.turretId, turret: TURRET_TYPES[previous.turretId], isDuplicate: previous.isDuplicate, fragmentsAwarded: previous.fragmentsAwarded, inventory: inv };
   if (inv.keys < 1) {
     return { success: false, error: "Insufficient keys. Each case opening requires 1 key." };
   }
@@ -188,17 +196,20 @@ function openTurretCase(discordId) {
 
   inv.caseHistory.push({
     id: `roll_${Date.now()}_${crypto.randomInt(1000, 9999)}`,
+    requestId,
     turretId: winningTurretId,
     isDuplicate,
     fragmentsAwarded,
     timestamp: Date.now(),
   });
 
+  inv.caseHistory = inv.caseHistory.slice(-100);
   inv.updatedAt = Date.now();
   saveInventories();
 
   return {
     success: true,
+    requestId,
     winningTurretId,
     turret: TURRET_TYPES[winningTurretId],
     isDuplicate,
@@ -318,21 +329,23 @@ function claimGift(recipientDiscordId, giftId) {
     return { success: false, error: `Gift is already ${gift.status}` };
   }
 
-  // Atomically mark claimed and grant keys
+  const inv = getInventory(idStr);
+  const alreadyGranted = inv.claimedGiftIds.includes(gift.id);
+  if (!alreadyGranted) {
+    inv.keys += gift.keys;
+    inv.claimedGiftIds.push(gift.id);
+    inv.updatedAt = Date.now();
+    // The balance and claim receipt commit in ONE atomic file operation.
+    saveInventories();
+  }
   gift.status = "claimed";
   gift.claimedAt = Date.now();
-
-  const inv = getInventory(idStr);
-  inv.keys += gift.keys;
-  inv.updatedAt = Date.now();
-
-  saveGifts();
-  saveInventories();
+  try { saveGifts(); } catch (error) { console.error('[Storage] Gift metadata deferred; durable claim receipt prevents duplicate grants:', error.message); }
 
   return {
     success: true,
     gift,
-    addedKeys: gift.keys,
+    addedKeys: alreadyGranted ? 0 : gift.keys,
     inventory: inv,
   };
 }
@@ -373,15 +386,35 @@ function getAllGiftsHistory(adminDiscordId) {
   return gifts.slice(0, 100);
 }
 
+function giftOperation(operation) {
+  return (...args) => {
+    const before = structuredClone(gifts);
+    try { return operation(...args); }
+    catch (error) { gifts = before; console.error('[Storage] Gift operation failed:', error.message); return { success: false, error: 'Gift storage unavailable. Please try again.' }; }
+  };
+}
+function durableOperation(operation, resultOnError = true) {
+  return (...args) => {
+    const id = String(args[0]);
+    const before = inventories.has(id) ? structuredClone(inventories.get(id)) : null;
+    try { return operation(...args); }
+    catch (error) {
+      if (before) inventories.set(id, before); else inventories.delete(id);
+      console.error('[Storage] Inventory operation failed:', error.message);
+      if (!resultOnError) throw error;
+      return { success: false, error: 'Inventory storage is temporarily unavailable. Your balance was not changed. Please try again.' };
+    }
+  };
+}
 module.exports = {
-  getInventory,
-  openTurretCase,
-  craftKeyFromFragments,
-  equipTurret,
-  createAdminGift,
+  getInventory: durableOperation(getInventory, false),
+  openTurretCase: durableOperation(openTurretCase),
+  craftKeyFromFragments: durableOperation(craftKeyFromFragments),
+  equipTurret: durableOperation(equipTurret),
+  createAdminGift: giftOperation(createAdminGift),
   getPendingGiftsForUser,
-  claimGift,
-  declineGift,
+  claimGift: durableOperation(claimGift),
+  declineGift: giftOperation(declineGift),
   getAllGiftsHistory,
   ADMIN_DISCORD_ID,
 };

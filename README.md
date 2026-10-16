@@ -11,7 +11,7 @@
 7. Keep your existing Cloudflare Tunnel hostname `timber.klarapp.com` pointing to `http://localhost:8080`.
 8. Join a Discord voice channel, launch the development Activity, and have a second person join that **same running Activity**.
 
-Test `http://localhost:8080/health` or `https://timber.klarapp.com/health` for server health. Opening the game in a regular browser is intentionally not supported: it needs Discord's embedded SDK environment.
+Test `http://localhost:8080/health` or `https://timber.klarapp.com/health` for server health. The game also supports browser guests; Discord players use their verified Discord identity. Guest progress uses a browser-local ID, so clearing browser storage creates a new guest identity.
 
 ## Notes
 
@@ -50,6 +50,24 @@ For the current Pi setup, set PORT=2323 in the deployed .env and target http://1
 
 Run node scripts/diagnose-connection.cjs on the Pi to compare local and public HTTP, polling sessions and WebSocket stability. If only the public target fails, inspect cloudflared logs at the same time; a 502 alone does not establish a bandwidth bottleneck.
 
-If WebSockets connect then drop, the browser now falls back to polling for the remainder of that page session. This also prevents repeated WebSocket upgrade attempts. Server transport errors are logged with [transport handshake] / [transport closed] without authentication payloads. Code 1006 means the WebSocket ended without a close frame; it does not establish the underlying cause.
+If WebSockets connect then drop, the browser falls back to polling without repeated upgrade attempts. After two polling failures it can try WebSocket again, so a broken polling route cannot trap the page permanently. Server transport errors are logged with [transport handshake] / [transport closed] without authentication payloads. Code 1006 means the WebSocket ended without a close frame; it does not establish the underlying cause.
 
 The multiplayer test suite also runs an 18-second Horde/FFA stability check with real enemy spawning and movement. It covers the undefined minStopDist crash that previously caused PM2 restarts and browser 502/reconnect loops. Enemy movement now uses the existing 5px arrival threshold and clamps its step to avoid overshooting.
+
+## Connection and inventory hardening (October 2026)
+
+A transport-close message describes the symptom; it does not identify the upstream cause. A tab reload can also end a pending poll. Check whether players actually disconnect, whether the process ID changes, and whether the local endpoint differs from the public tunnel.
+
+Run `node scripts/diagnose-connection.cjs` on the Pi. It probes local and public health, both transport heartbeats for 30 seconds, and checks whether the process restarted. It creates no player or inventory. Use `--public-only` or `--local-only` for one target and `--duration=30000` to select the interval. Set `PUBLIC_GAME_URL` to override the public hostname. Health now reports uptime, event-loop delay and transport-error counters alongside the build and process ID.
+
+The server sends heartbeats every 10 seconds with a 20-second response timeout. Any reverse proxy must preserve both polling GET/POST and WebSocket upgrades to the same single process. Its read timeout must exceed the heartbeat interval plus timeout; see [Socket.IO reverse-proxy documentation](https://socket.io/docs/v4/reverse-proxy/). Do not cache or buffer `/socket.io/`. Keep the existing Cloudflare tunnel target at the explicit IPv4 address and PORT in the deployed .env. Do not add a second proxy unless your hosting needs one.
+
+The updater now verifies both local transports for 15 seconds before saving PM2 state. After updating on the Pi, run the full 30-second local/public diagnostic. Passing local checks does not prove that the public tunnel or Discord proxy works.
+
+Case opening uses a persistent request receipt. A timeout or reconnect resends the same request ID and returns the same item without spending a second key. The inventory and receipt commit together. Failed writes return an error and restore the balance in memory; unreadable inventory files stop startup instead of being silently overwritten. A starter-key flag survives reconnects and restarts. Legacy inventories with keys or case history are treated as already granted. Authenticated players are identified by Discord ID; browser guests by a stored UUID. This does not prevent a guest deliberately clearing local storage from creating a new identity.
+
+Horde lobbies reserve dropped players' seats for 45 seconds and restore their party and upgrades when they reconnect. Connected members receive host controls when the leader drops. Explicit Leave removes membership immediately. A squad with no active players does not spawn enemies or take base damage. Parties and matches remain in memory and do not survive a server restart.
+
+Run `npm test` for disk-write failure, case replay/restart, transport fallback in both directions, multiplayer movement, horde simulation, eight-player party limits and real-network party-reconnect checks. Tests use isolated inventory directories.
+
+The hangar background is an optimized local WebP generated with the built-in image-generation tool. Source prompt: cinematic industrial defense hangar, cyan strip lights, red emergency accents, wet metal floor, dark left side for menu text, empty circular pedestal on the right, no characters or lettering. The runtime asset is `src/assets/hangar-menu.webp`; original artwork is `src/assets/hangar-menu.png`.

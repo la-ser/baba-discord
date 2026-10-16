@@ -1,4 +1,7 @@
 const path = require("path");
+const { monitorEventLoopDelay } = require("node:perf_hooks");
+const loopDelay = monitorEventLoopDelay({ resolution: 20 }); loopDelay.enable();
+const transportStats = { websocketErrors: 0, pollingErrors: 0 };
 const { PORT } = require("./server-port.cjs");
 const express = require("express"),
   http = require("http");
@@ -16,13 +19,16 @@ const { BABY_CYBORG_CONFIG } = require("./babyCyborgConfig.cjs");
 const guestInventories = new Map();
 function getGuestInventory(socketId, inventoryId) {
   if (!guestInventories.has(socketId)) {
-    guestInventories.set(socketId, inventoryStorage.getInventory(inventoryId));
+    guestInventories.set(socketId, inventoryId);
   }
-  return guestInventories.get(socketId);
+  return inventoryStorage.getInventory(guestInventories.get(socketId));
 }
 const app = express(),
   server = http.createServer(app),
-  io = new Server(server);
+  io = new Server(server, { pingInterval: 10000, pingTimeout: 20000, maxHttpBufferSize: 65536, perMessageDeflate: false, httpCompression: false });
+server.requestTimeout = 0; // Long polls wait for heartbeat or world packets.
+server.headersTimeout = 65000;
+server.keepAliveTimeout = 65000;
 // Keep transport failures visible without logging OAuth tokens or handshake payloads.
 io.engine.on("connection_error", error => {
   console.warn("[transport handshake]", JSON.stringify({ code: error.code, message: error.message, detail: error.context?.message }));
@@ -31,6 +37,7 @@ io.engine.on("connection", connection => {
   const started = Date.now();
   connection.on("close", (reason, description) => {
     if (reason === "transport error" || (reason === "transport close" && Date.now() - started < 15000)) {
+      if (reason === "transport error") transportStats[connection.transport?.name === "websocket" ? "websocketErrors" : "pollingErrors"]++;
       console.warn("[transport closed]", JSON.stringify({
         transport: connection.transport?.name, reason, ageMs: Date.now() - started,
         detail: description?.message, code: description?.code,
@@ -2008,7 +2015,8 @@ class HordeGame {
   }
 
   update(dt, wallNow, roomPlayerIds, bullets, io) {
-    const activePlayerCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
+    const activePlayerCount = [...roomPlayerIds].filter(id => players.get(id)?.active).length;
+    if (activePlayerCount === 0) return; // A lobby or reconnecting squad must not lose its base off-screen.
 
     if (this.pendingBossSpawnAt && wallNow >= this.pendingBossSpawnAt) {
       this.pendingBossSpawnAt = null;
@@ -3348,7 +3356,7 @@ try {
 } catch {}
 app.get("/health", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  res.json({ ok: true, players: players.size, build: clientBuild, processId: process.pid });
+  res.json({ ok: true, players: players.size, build: clientBuild, processId: process.pid, uptimeSeconds: Math.floor(process.uptime()), eventLoopP99Ms: Math.round(loopDelay.percentile(99) / 1e6), transports: transportStats });
 });
 app.get("/favicon.ico", (req, res) => res.redirect(302, "/favicon.svg"));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -3358,6 +3366,7 @@ io.use(async (socket, next) => {
   const validCustomName = (typeof customName === "string" && customName.trim().length > 0)
     ? customName.trim().slice(0, 20)
     : null;
+  if (accessToken !== undefined && typeof accessToken !== "string") return next(new Error("Invalid authentication token"));
   if (accessToken === "dev-token" || !accessToken || accessToken.startsWith("guest-")) {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const validGuest = (typeof guestName === "string" && /^Guest\d{4}$/.test(guestName))
@@ -3400,7 +3409,17 @@ io.use(async (socket, next) => {
     next(new Error("Could not verify Discord user"));
   }
 });
-const attachParty = require("./parties.cjs")(io);
+io.use((socket, next) => {
+  try { inventoryStorage.getInventory(socket.data.identity.id); next(); }
+  catch { next(new Error("Inventory storage unavailable. Please try again later.")); }
+});
+function cleanupInactiveRoom(room) {
+  if (rooms.get(room)?.size) return;
+  const game = hordeGames.get(room); clearTimeout(game?.upgradeTimeout);
+  hordeGames.delete(room); rooms.delete(room); roomScores.delete(room); roomObjects.delete(room);
+  for (let i = bullets.length - 1; i >= 0; i--) if (bullets[i].room === room) bullets.splice(i, 1);
+}
+const attachParty = require("./parties.cjs")(io, { onEmpty: cleanupInactiveRoom });
 io.on("connection", (socket) => {
   const { id: discordId, name, instanceId, mode: initialMode } = socket.data.identity;
   const isGuest = Boolean(socket.data.identity?.isGuest);
@@ -3576,8 +3595,12 @@ io.on("connection", (socket) => {
       return;
     }
     const oldRoom = p.room;
+    if (p.score?.socketId === socket.id) p.score.socketId = null;
+    p.active = false;
+    p.keys = { up: false, down: false, left: false, right: false };
     socket.leave(oldRoom);
     rooms.get(oldRoom)?.delete(socket.id);
+    if (!attachParty.hasRoom(oldRoom)) cleanupInactiveRoom(oldRoom);
 
     p.mode = validMode;
     const newRoom = targetRoom;
@@ -3585,6 +3608,11 @@ io.on("connection", (socket) => {
     socket.join(newRoom);
     if (!rooms.has(newRoom)) rooms.set(newRoom, new Set());
     rooms.get(newRoom).add(socket.id);
+    if (!roomScores.has(newRoom)) roomScores.set(newRoom, new Map());
+    const nextScores = roomScores.get(newRoom);
+    p.score = nextScores.get(discordId) || { discordId, name: p.name, kills: 0, deaths: 0 };
+    p.score.socketId = socket.id; p.score.name = p.name;
+    nextScores.set(discordId, p.score);
 
     if (validMode === "horde") {
       p.character = "scientist";
@@ -4107,7 +4135,9 @@ io.on("connection", (socket) => {
 
   // === INVENTORY & CS CASE OPENING HANDLERS ===
   socket.on("get_inventory", () => {
-    const inv = isGuest ? getGuestInventory(socket.id) : inventoryStorage.getInventory(discordId);
+    let inv;
+    try { inv = inventoryStorage.getInventory(discordId); }
+    catch { socket.emit("inventory_error", { error: "Inventory unavailable. Please try again." }); return; }
     socket.emit("inventory_sync", {
       inventory: inv,
       isAdmin: !isGuest && discordId === ADMIN_DISCORD_ID,
@@ -4115,8 +4145,8 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("open_turret_case", () => {
-    const res = inventoryStorage.openTurretCase(discordId);
+  socket.on("open_turret_case", (payload) => {
+    const res = inventoryStorage.openTurretCase(discordId, payload?.requestId);
     socket.emit("case_opening_result", res);
     if (res.success) {
       socket.emit("inventory_sync", {
@@ -4235,7 +4265,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     guestInventories.delete(socket.id);
-    if (score.socketId === socket.id) score.socketId = null;
+    if (p.score.socketId === socket.id) p.score.socketId = null;
     players.delete(socket.id);
     const horde = hordeGames.get(p.room);
     if (horde && horde.waveState === "upgrade_selection") {
@@ -4247,7 +4277,7 @@ io.on("connection", (socket) => {
     }
     const ids = rooms.get(p.room);
     ids?.delete(socket.id);
-    if (ids?.size === 0) {
+    if (ids?.size === 0 && !party.room()) {
       rooms.delete(p.room);
       roomScores.delete(p.room);
       roomObjects.delete(p.room);

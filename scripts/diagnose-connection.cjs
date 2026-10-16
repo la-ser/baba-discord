@@ -1,50 +1,14 @@
-const { PORT } = require("../server-port.cjs");
-const WebSocket = require("ws");
-const targets = { local: `http://127.0.0.1:${PORT}`, public: "https://baba.klarapp.com" };
-async function probe(label, base) {
-  const result = { target: label, url: base, health: [], polling: null, websocket: null };
-  for (let i = 0; i < 3; i++) {
-    try {
-      const r = await fetch(base + "/health?diagnostic=" + Date.now(), { signal: AbortSignal.timeout(5000), cache: "no-store" });
-      result.health.push({ status: r.status, ...(r.ok ? await r.json() : {}) });
-    } catch (e) { result.health.push({ error: e.cause?.code || e.message }); }
-  }
-  try {
-    const endpoint = base + "/socket.io/?EIO=4&transport=polling";
-    const r = await fetch(endpoint, { signal: AbortSignal.timeout(5000) });
-    const packet = await r.text();
-    if (r.status !== 200 || !packet.startsWith("0")) throw new Error("handshake HTTP " + r.status);
-    const { sid } = JSON.parse(packet.slice(1));
-    const session = endpoint + "&sid=" + encodeURIComponent(sid);
-    const auth = await fetch(session, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: '40{"accessToken":"dev-token","instanceId":"transport-diagnostic"}', signal: AbortSignal.timeout(5000) });
-    if (!auth.ok) throw new Error("session POST HTTP " + auth.status);
-    const response = await fetch(session, { signal: AbortSignal.timeout(5000) });
-    const packets = await response.text();
-    result.polling = response.ok && packets.split("\x1e").some(p => p.startsWith("40")) ? "PASS: authenticated session" : "FAIL: session HTTP " + response.status + " " + packets.slice(0, 100);
-    await fetch(session, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: "41\x1e1", signal: AbortSignal.timeout(2000) }).catch(() => {});
-  } catch (e) { result.polling = "FAIL: " + e.message; }
-  result.websocket = await new Promise(resolve => {
-    let finished = false, authenticated = false;
-    const started = Date.now();
-    const frames = [];
-    const ws = new WebSocket(base.replace(/^http/, "ws") + "/socket.io/?EIO=4&transport=websocket", { handshakeTimeout: 5000 });
-    const finish = message => { if (finished) return; finished = true; clearTimeout(timer); ws.close(); resolve({ result: message, authenticated, elapsedMs: Date.now() - started, frames }); };
-    const timer = setTimeout(() => finish(authenticated && ws.readyState === WebSocket.OPEN ? "PASS: authenticated and stable for 5 seconds" : "FAIL: did not authenticate"), 5000);
-    ws.on("message", data => {
-      const p = String(data);
-      if (frames.length < 8) frames.push(p.slice(0, 2));
-      if (p.startsWith("0")) ws.send('40{"accessToken":"dev-token","instanceId":"transport-diagnostic"}');
-      if (p.startsWith("40")) authenticated = true;
-      if (p === "2") ws.send("3");
-    });
-    ws.on("error", error => finish("FAIL: " + error.message));
-    ws.on("close", (code) => finish("FAIL: closed early, code " + code));
-  });
-  return result;
-}
-console.log("Runtime:", JSON.stringify({ node: process.version, arch: process.arch, ws: require("ws/package.json").version, socketIo: require("socket.io/package.json").version }));
-Promise.all(Object.entries(targets).map(([label, base]) => probe(label, base))).then(results => {
-  console.log(JSON.stringify(results, null, 2));
-  console.log("If local passes and public fails, inspect cloudflared logs: journalctl -u cloudflared --since '5 minutes ago' --no-pager");
-  console.log("If local also fails, inspect PM2 logs and the listener on port " + PORT + ".");
-}).catch(e => { console.error(e.message); process.exitCode = 1; });
+const { PORT } = require('../server-port.cjs');
+const { probeTarget } = require('./transport-probe.cjs');
+const args = process.argv.slice(2);
+const durationMs = Math.max(1000, Math.min(40000, Number(args.find(a => a.startsWith('--duration='))?.split('=')[1]) || 30000));
+const publicUrl = process.env.PUBLIC_GAME_URL || 'https://baba.klarapp.com';
+const targets = args.includes('--local-only') ? [`http://127.0.0.1:${PORT}`] : args.includes('--public-only') ? [publicUrl] : [`http://127.0.0.1:${PORT}`, publicUrl];
+console.log('Checking HTTP health, process stability and both transports for ' + durationMs / 1000 + ' seconds. No player inventory is created.');
+Promise.all(targets.map(base => probeTarget(base, durationMs))).then(results => {
+ console.log(JSON.stringify(results, null, 2));
+ if (results.some(r => !r.ok)) {
+   console.error('Transport verification failed. If local passes but public fails, check the tunnel target and cloudflared logs. If the processId changes, inspect the PM2 crash log.');
+   process.exitCode = 1;
+ }
+}).catch(error => { console.error(error); process.exitCode = 1; });

@@ -16,7 +16,10 @@ async function verify() {
         const response = await fetch(`http://127.0.0.1:${PORT}/health`, { signal: AbortSignal.timeout(2000) });
         const health = await response.json();
         if (response.ok && health.ok && health.build === expectedBuild && health.processId === apps[0].pid) {
-          console.log(`Verified one game process on port ${PORT}, build ${health.build}`);
+          const { probeTarget } = require('./transport-probe.cjs');
+          const transportCheck = await probeTarget('http://127.0.0.1:' + PORT, 15000);
+          if (!transportCheck.ok || transportCheck.health.some(h => h.processId !== apps[0].pid)) throw new Error('Local transport stability check failed: ' + JSON.stringify(transportCheck));
+          console.log(`Verified one game process, both transports stable, port ${PORT}, build ${health.build}`);
           return;
         }
       } catch {}
