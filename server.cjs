@@ -1016,9 +1016,124 @@ class HordeGame {
     return chosen;
   }
 
+  autoPlaceObject(player, rawType, io) {
+    const type = (rawType === "wall" || rawType === "barricade") ? "barricade" : rawType;
+    if (!["barricade", "turret", "trap"].includes(type)) return null;
+
+    // Check caps (Barricade 12, Turret 6, Trap 6)
+    const maxCaps = { barricade: 12, turret: 6, trap: 6 };
+    const currentCount = this.placedObjects.filter(o => o.type === type).length;
+    if (currentCount >= (maxCaps[type] || 12)) {
+      // If already capped, remove the oldest one of this type to upgrade position
+      const oldIdx = this.placedObjects.findIndex(o => o.type === type);
+      if (oldIdx !== -1) {
+        this.placedObjects.splice(oldIdx, 1);
+      }
+    }
+
+    // Determine target placement rings and clearance around Granny (ARENA_CENTER = 1800, 1800)
+    let ringRadius = 145;
+    let minSpacing = 42;
+    let fallbackRings = [145, 185];
+    if (type === "turret") {
+      ringRadius = 195;
+      minSpacing = 65;
+      fallbackRings = [195, 235];
+    } else if (type === "trap") {
+      ringRadius = 270;
+      minSpacing = 85;
+      fallbackRings = [270, 320, 225];
+    }
+
+    let bestX = ARENA_CENTER.x + ringRadius;
+    let bestY = ARENA_CENTER.y;
+    let bestAngle = 0;
+    let maxMinDist = -1;
+
+    for (const r of fallbackRings) {
+      const candidates = 24;
+      for (let i = 0; i < candidates; i++) {
+        const candAngle = (i / candidates) * Math.PI * 2 + (type === "turret" ? 0.15 : (type === "trap" ? 0.3 : 0));
+        const cx = ARENA_CENTER.x + Math.cos(candAngle) * r;
+        const cy = ARENA_CENTER.y + Math.sin(candAngle) * r;
+
+        let minDistSame = 99999;
+        for (const obj of this.placedObjects) {
+          if (obj.type === type) {
+            const d = Math.hypot(cx - obj.x, cy - obj.y);
+            if (d < minDistSame) minDistSame = d;
+          }
+        }
+
+        const distToCenter = Math.hypot(cx - ARENA_CENTER.x, cy - ARENA_CENTER.y);
+        if (distToCenter < 70) continue;
+
+        if (minDistSame > maxMinDist) {
+          maxMinDist = minDistSame;
+          bestX = cx;
+          bestY = cy;
+          if (type === "barricade") {
+            bestAngle = candAngle + Math.PI / 2; // Tangent defensive wall
+          } else if (type === "turret") {
+            bestAngle = candAngle; // Outward firing line
+          } else {
+            bestAngle = 0;
+          }
+        }
+      }
+      if (maxMinDist >= minSpacing) break;
+    }
+
+    const newObj = {
+      id: this.nextObjectId++,
+      type,
+      ownerId: player ? player.id : "system",
+      x: Math.round(bestX),
+      y: Math.round(bestY),
+      radius: type === "barricade" ? 30 : (type === "turret" ? 22 : 60),
+      hp: type === "barricade" ? 60 : (type === "turret" ? 28 : 100),
+      maxHp: type === "barricade" ? 60 : (type === "turret" ? 28 : 100),
+      angle: Number.isFinite(bestAngle) ? bestAngle : 0,
+      state: "ready",
+      lastShotAt: 0,
+      baseRange: 240,
+      baseCooldown: 750,
+      baseDamage: 2.2,
+      frozenUntil: 0,
+      recoveryUntil: 0,
+    };
+
+    this.placedObjects.push(newObj);
+    io.to(this.room).emit("horde_object_placed", { object: newObj, autoPlaced: true });
+    return newObj;
+  }
+
+  autoPlaceAllPending(player, io) {
+    if (!player || !Array.isArray(player.pendingPlacements) || player.pendingPlacements.length === 0) return;
+    const placed = [];
+    while (player.pendingPlacements.length > 0) {
+      const type = player.pendingPlacements.shift();
+      const obj = this.autoPlaceObject(player, type, io);
+      if (obj) placed.push(obj);
+    }
+    const targetSocket = io.sockets.sockets.get(player.id);
+    if (targetSocket) {
+      targetSocket.emit("exit_placement_mode");
+      if (placed.length > 0) {
+        targetSocket.emit("placement_autoplaced", { count: placed.length });
+      }
+    }
+  }
+
   applyCardUpgrade(player, cardId, io) {
     const card = HORDE_CARDS[cardId];
     if (!card) return;
+
+    // If player has unplaced/stacked objects from previous wave, auto-place them around Granny in a smart way
+    if (player.pendingPlacements && player.pendingPlacements.length > 0) {
+      this.autoPlaceAllPending(player, io);
+    }
+
     card.apply(player, this);
 
     const upgradePayload = {
@@ -1047,6 +1162,14 @@ class HordeGame {
   }
 
   startNextWave(io, roomPlayerIds) {
+    // If any player hasn't placed their rewards before the next wave begins, auto-place them around Granny
+    for (const pid of roomPlayerIds) {
+      const p = players.get(pid);
+      if (p && p.pendingPlacements && p.pendingPlacements.length > 0) {
+        this.autoPlaceAllPending(p, io);
+      }
+    }
+
     this.wave += 1;
     this.waveState = "active";
     const activeCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
@@ -2615,7 +2738,21 @@ io.on("connection", (socket) => {
     };
     horde.placedObjects.push(newObj);
     io.to(p.room).emit("horde_object_placed", { object: newObj });
-    socket.emit("exit_placement_mode");
+    if (p.pendingPlacements && p.pendingPlacements.length > 0) {
+      socket.emit("enter_placement_mode", { objectType: p.pendingPlacements[0] });
+    } else {
+      socket.emit("exit_placement_mode");
+    }
+  });
+  socket.on("cancel_placement", () => {
+    if (p.mode !== "horde") return;
+    const horde = hordeGames.get(p.room);
+    if (!horde) return;
+    if (p.pendingPlacements && p.pendingPlacements.length > 0) {
+      horde.autoPlaceAllPending(p, io);
+    } else {
+      socket.emit("exit_placement_mode");
+    }
   });
   socket.on("tom_aura", () => {
     const now = Date.now();
