@@ -2926,69 +2926,103 @@
       #abilities-drawer {
         position: fixed;
         inset: 0;
-        z-index: 110;
+        z-index: 1200;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 20px;
-        background: radial-gradient(circle at 50% 50%, rgba(10, 16, 28, 0.85) 0%, rgba(2, 4, 10, 0.96) 100%);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        padding: clamp(12px, 3vh, 24px) 16px;
+        background: radial-gradient(circle at 50% 45%, rgba(10, 18, 34, 0.88) 0%, rgba(2, 4, 10, 0.97) 100%);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
         animation: rpgBackdropFade 0.25s ease-out;
       }
       .arsenal-modal-container {
         position: relative;
         width: 100%;
-        max-width: 780px;
+        max-width: 960px;
         max-height: 88vh;
-        overflow-y: auto;
-        background: linear-gradient(175deg, rgba(16, 24, 40, 0.98) 0%, rgba(8, 12, 22, 0.98) 100%);
-        border: 1px solid rgba(0, 229, 255, 0.35);
-        border-radius: 16px;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 40px rgba(0, 229, 255, 0.2);
-        padding: 24px 28px;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(175deg, rgba(16, 24, 42, 0.97) 0%, rgba(8, 12, 22, 0.99) 100%);
+        border: 1px solid rgba(0, 229, 255, 0.4);
+        border-radius: 18px;
+        box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9), 0 0 45px rgba(0, 229, 255, 0.18);
+        padding: 0;
         color: #ffffff;
+        overflow: hidden;
+      }
+      .arsenal-modal-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #00e5ff 30%, #ffbe1a 70%, transparent);
+        z-index: 2;
       }
       .arsenal-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding-bottom: 16px;
-        margin-bottom: 20px;
+        padding: 20px 26px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.02);
       }
       .arsenal-title-wrap {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
       }
       .arsenal-title-icon {
-        font-size: 24px;
+        font-size: 26px;
         color: #00e5ff;
-        filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.6));
+        filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.7));
       }
       .arsenal-title {
         font-size: 19px;
-        font-weight: 900;
+        font-weight: 950;
         letter-spacing: 0.08em;
         margin: 0;
         text-transform: uppercase;
+        color: #ffffff;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
       }
       .arsenal-subtitle {
         font-size: 11px;
         color: #94a3b8;
         font-family: var(--font-mono);
-        margin: 2px 0 0;
+        margin: 3px 0 0;
         letter-spacing: 0.1em;
+      }
+      .arsenal-header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .arsenal-mode-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        font-weight: 900;
+        padding: 5px 12px;
+        border-radius: 6px;
+        background: rgba(0, 229, 255, 0.1);
+        border: 1px solid rgba(0, 229, 255, 0.35);
+        color: #00e5ff;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
       }
       .arsenal-close-btn {
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid rgba(255, 255, 255, 0.15);
         color: #94a3b8;
-        font-size: 18px;
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
+        font-size: 16px;
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
         display: grid;
         place-items: center;
         cursor: pointer;
@@ -2998,95 +3032,249 @@
         background: rgba(255, 51, 75, 0.2);
         border-color: #ff334b;
         color: #ffffff;
+        transform: scale(1.05);
       }
+      .arsenal-scroll-content {
+        padding: 20px 26px;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+      }
+      .arsenal-scroll-content::-webkit-scrollbar {
+        width: 6px;
+      }
+      .arsenal-scroll-content::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.25);
+      }
+      .arsenal-scroll-content::-webkit-scrollbar-thumb {
+        background: rgba(0, 229, 255, 0.3);
+        border-radius: 4px;
+      }
+      .arsenal-scroll-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 229, 255, 0.6);
+      }
+
       .arsenal-section {
-        margin-bottom: 20px;
+        margin-bottom: 22px;
+      }
+      .arsenal-section:last-child {
+        margin-bottom: 6px;
       }
       .arsenal-section-heading {
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 900;
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: #38bdf8;
         font-family: var(--font-mono);
-        margin-bottom: 10px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding-bottom: 6px;
+      }
+      .arsenal-section-heading i {
+        color: #00e5ff;
+        font-size: 13px;
       }
       .arsenal-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+        gap: 12px;
       }
-      .arsenal-item {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
+
+      /* Clean Tactical Arsenal Card */
+      .arsenal-card {
+        background: rgba(14, 22, 38, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
         padding: 12px 14px;
         display: flex;
-        align-items: center;
-        gap: 12px;
-        transition: all 0.2s;
+        flex-direction: column;
+        gap: 8px;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
       }
-      .arsenal-item.is-unlocked {
-        background: rgba(0, 229, 255, 0.06);
+      .arsenal-card:hover {
+        border-color: rgba(0, 229, 255, 0.4);
+        background: rgba(18, 28, 48, 0.85);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+        transform: translateY(-1px);
+      }
+      .arsenal-card.is-unlocked {
         border-color: rgba(0, 229, 255, 0.35);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(160deg, rgba(14, 28, 46, 0.8) 0%, rgba(10, 18, 32, 0.85) 100%);
       }
-      .arsenal-item-icon {
-        width: 38px;
-        height: 38px;
+      .arsenal-card.is-locked {
+        opacity: 0.62;
+        border-color: rgba(255, 255, 255, 0.07);
+        background: rgba(12, 16, 26, 0.5);
+      }
+      .arsenal-card-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+      }
+      .arsenal-card-icon {
+        width: 34px;
+        height: 34px;
         border-radius: 8px;
         background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         display: grid;
         place-items: center;
-        font-size: 16px;
-        color: #64748b;
+        font-size: 15px;
+        color: #94a3b8;
         flex-shrink: 0;
       }
-      .arsenal-item.is-unlocked .arsenal-item-icon {
+      .arsenal-card.is-unlocked .arsenal-card-icon {
         color: #00e5ff;
         border-color: rgba(0, 229, 255, 0.4);
-        box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
       }
-      .arsenal-item-info {
+      .arsenal-card.is-unlocked .arsenal-card-icon.core-icon {
+        color: #ffbe1a;
+        border-color: rgba(255, 190, 26, 0.4);
+        box-shadow: 0 0 10px rgba(255, 190, 26, 0.25);
+      }
+      .arsenal-card.is-unlocked .arsenal-card-icon.cannon-icon {
+        color: #f97316;
+        border-color: rgba(249, 115, 22, 0.4);
+        box-shadow: 0 0 10px rgba(249, 115, 22, 0.25);
+      }
+      .arsenal-card.is-unlocked .arsenal-card-icon.aura-icon {
+        color: #22c55e;
+        border-color: rgba(34, 197, 94, 0.4);
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.25);
+      }
+      .arsenal-card.is-unlocked .arsenal-card-icon.trap-icon {
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.4);
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+      }
+      .arsenal-card-title-group {
         flex: 1;
         min-width: 0;
       }
-      .arsenal-item-name {
+      .arsenal-card-title {
         font-size: 13px;
-        font-weight: 800;
+        font-weight: 850;
         margin: 0;
+        letter-spacing: 0.03em;
+        color: #ffffff;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      .arsenal-item-status {
+      .arsenal-card-sub {
+        display: block;
         font-family: var(--font-mono);
-        font-size: 10px;
-        font-weight: 700;
-        color: #64748b;
-        margin-top: 2px;
+        font-size: 9.5px;
+        color: #94a3b8;
+        margin-top: 1px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
-      .arsenal-item.is-unlocked .arsenal-item-status {
-        color: #22c55e;
-      }
-      .arsenal-item-tag {
+      .arsenal-status-pill {
         font-family: var(--font-mono);
         font-size: 9px;
-        font-weight: 850;
+        font-weight: 900;
+        letter-spacing: 0.08em;
         padding: 3px 8px;
-        border-radius: 4px;
-        background: rgba(255, 255, 255, 0.08);
-        color: #94a3b8;
-        align-self: center;
+        border-radius: 5px;
+        flex-shrink: 0;
+        text-transform: uppercase;
       }
-      .arsenal-item.is-unlocked .arsenal-item-tag {
-        background: rgba(0, 229, 255, 0.15);
+      .arsenal-status-pill.is-active {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      .arsenal-status-pill.is-boosted {
+        background: rgba(255, 190, 26, 0.15);
+        color: #ffbe1a;
+        border: 1px solid rgba(255, 190, 26, 0.4);
+      }
+      .arsenal-status-pill.is-locked {
+        background: rgba(255, 255, 255, 0.06);
+        color: #64748b;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .arsenal-status-pill.is-idle {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+      }
+      .arsenal-status-pill.is-danger {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+      .arsenal-card-desc {
+        font-size: 11px;
+        color: #94a3b8;
+        line-height: 1.4;
+        margin: 0;
+      }
+      .arsenal-chips-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .arsenal-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 3px 8px;
+        border-radius: 5px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: #cbd5e1;
+        white-space: nowrap;
+      }
+      .arsenal-chip i {
+        font-size: 9.5px;
         color: #00e5ff;
-        border: 1px solid rgba(0, 229, 255, 0.3);
+      }
+      .arsenal-chip.accent {
+        background: rgba(0, 229, 255, 0.08);
+        border-color: rgba(0, 229, 255, 0.25);
+        color: #00e5ff;
+      }
+      .arsenal-chip .boost {
+        color: #ffd166;
+        font-weight: 850;
+      }
+      .arsenal-core-hp-bar {
+        width: 100%;
+        height: 7px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .arsenal-core-hp-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #00ff9d, #00e5ff);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+      .arsenal-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 26px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(0, 0, 0, 0.25);
       }
 
       /* Horde Object Placement Banner */
@@ -3141,7 +3329,7 @@
         color: #fff;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-DuV11w-A.js"></script>
+    <script type="module" crossorigin src="/assets/index-C4u1-jaA.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -3816,45 +4004,54 @@
               <p class="arsenal-subtitle">ACTIVE OPERATIVE CAPABILITIES & SQUAD DEFENSES</p>
             </div>
           </div>
-          <button id="close-abilities-drawer" class="arsenal-close-btn" type="button" aria-label="Close">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-
-        <!-- Section 1: Operative Core Abilities -->
-        <div class="arsenal-section">
-          <div class="arsenal-section-heading">
-            <i class="fa-solid fa-person-running"></i>
-            <span>Operative Mobility & Combat Skills</span>
-          </div>
-          <div class="arsenal-grid" id="arsenal-player-abilities">
-            <!-- Dynamic items populated by main.js -->
+          <div class="arsenal-header-right">
+            <span id="arsenal-mode-badge" class="arsenal-mode-badge"><i class="fa-solid fa-shield-halved"></i> HORDE DEFENSE</span>
+            <button id="close-abilities-drawer" class="arsenal-close-btn" type="button" aria-label="Close">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
         </div>
 
-        <!-- Section 2: Granny Core & Team Perks (Horde Mode) -->
-        <div class="arsenal-section" id="arsenal-granny-section">
-          <div class="arsenal-section-heading">
-            <i class="fa-solid fa-shield-cat"></i>
-            <span>Granny Core Defenses & Team Perks</span>
+        <div class="arsenal-scroll-content">
+          <!-- Section 1: Operative Core Abilities -->
+          <div class="arsenal-section">
+            <div class="arsenal-section-heading">
+              <i class="fa-solid fa-person-running"></i>
+              <span>Operative Mobility & Combat Skills</span>
+            </div>
+            <div class="arsenal-grid" id="arsenal-player-abilities">
+              <!-- Dynamic items populated by main.js -->
+            </div>
           </div>
-          <div class="arsenal-grid" id="arsenal-team-upgrades">
-            <!-- Dynamic items populated by main.js -->
+
+          <!-- Section 2: Granny Core & Team Perks (Horde Mode) -->
+          <div class="arsenal-section" id="arsenal-granny-section">
+            <div class="arsenal-section-heading">
+              <i class="fa-solid fa-shield-cat"></i>
+              <span>Granny Core Defenses & Team Perks</span>
+            </div>
+            <div class="arsenal-grid" id="arsenal-team-upgrades">
+              <!-- Dynamic items populated by main.js -->
+            </div>
+          </div>
+
+          <!-- Section 3: Placed Hardware & Overclocks -->
+          <div class="arsenal-section" id="arsenal-hardware-section">
+            <div class="arsenal-section-heading">
+              <i class="fa-solid fa-cubes-stacked"></i>
+              <span>Deployed Hardware & Overclock Enhancements</span>
+            </div>
+            <div class="arsenal-grid" id="arsenal-hardware-upgrades">
+              <!-- Dynamic items populated by main.js -->
+            </div>
           </div>
         </div>
 
-        <!-- Section 3: Placed Hardware & Overclocks -->
-        <div class="arsenal-section" id="arsenal-hardware-section">
-          <div class="arsenal-section-heading">
-            <i class="fa-solid fa-cubes-stacked"></i>
-            <span>Deployed Hardware & Overclock Enhancements</span>
-          </div>
-          <div class="arsenal-grid" id="arsenal-hardware-upgrades">
-            <!-- Dynamic items populated by main.js -->
-          </div>
-        </div>
-        <div class="arsenal-footer" style="display: flex; justify-content: flex-end; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
-          <button id="btn-close-arsenal-footer" class="btn btn-primary" type="button" style="padding: 7px 20px; font-size: 11px; font-weight: 850; letter-spacing: 0.08em; border-radius: 8px;">RETURN TO COMBAT</button>
+        <div class="arsenal-footer">
+          <span style="font-family: var(--font-mono); font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-circle-info" style="color: #00e5ff;"></i> Press <kbd style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); padding: 2px 6px; border-radius: 4px; color: #fff;">TAB</kbd> or <kbd style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); padding: 2px 6px; border-radius: 4px; color: #fff;">ESC</kbd> to toggle anytime
+          </span>
+          <button id="btn-close-arsenal-footer" class="btn btn-primary" type="button" style="padding: 7px 22px; font-size: 11px; font-weight: 850; letter-spacing: 0.08em; border-radius: 8px;">RETURN TO COMBAT</button>
         </div>
       </div>
     </div>

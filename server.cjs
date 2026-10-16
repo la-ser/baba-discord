@@ -236,12 +236,35 @@ const HORDE_CARDS = {
     category: "utility",
     rarity: "common",
     name: "Granny Defense Cannon",
-    desc: "Granny statue auto-fires high-power plasma at nearest enemy. Stacking reduces fire delay.",
+    desc: "Granny statue auto-fires rapid plasma bolts (1.6s reload, 720px range). Stacking accelerates fire rate down to 0.45s.",
     icon: "🔱",
     faIcon: "fa-solid fa-crosshairs",
     condition: (player, horde) => true,
     apply: (player, horde) => {
       horde.grannyTurretLevel = (horde.grannyTurretLevel || 0) + 1;
+    }
+  },
+  repair_all_structures: {
+    id: "repair_all_structures",
+    category: "upgrade",
+    rarity: "rare",
+    name: "Nanite Field Restoration",
+    desc: "Deploy an emergency nanite pulse instantly restoring all deployed barricades, sentries, and traps to 100% full health (excludes Granny Core).",
+    icon: "🔧",
+    faIcon: "fa-solid fa-wrench",
+    condition: (player, horde) => (horde.placedObjects || []).some(o => o.hp < o.maxHp),
+    apply: (player, horde) => {
+      let repairedCount = 0;
+      for (const obj of (horde.placedObjects || [])) {
+        if (obj.hp < obj.maxHp) {
+          obj.hp = obj.maxHp;
+          repairedCount++;
+        }
+      }
+      io.to(horde.room).emit("structures_repaired", {
+        repairedCount,
+        restoredBy: player.name || "Operative",
+      });
     }
   },
   granny_repair: {
@@ -604,10 +627,10 @@ class HordeGame {
 
     // 1. Granny Core Cannon firing
     if (this.grannyTurretLevel > 0 && this.waveState === "active") {
-      const cooldown = Math.max(1000, 5000 - (this.grannyTurretLevel - 1) * 900);
+      const cooldown = Math.max(450, 1600 - (this.grannyTurretLevel - 1) * 260);
       if (wallNow - (this.lastGrannyShotAt || 0) >= cooldown) {
         let closestEnemy = null;
-        let closestDist = 580;
+        let closestDist = 720;
         for (const enemy of this.enemies) {
           const d = Math.hypot(enemy.x - ARENA_CENTER.x, enemy.y - ARENA_CENTER.y);
           if (d < closestDist) {
@@ -618,17 +641,17 @@ class HordeGame {
         if (closestEnemy) {
           this.lastGrannyShotAt = wallNow;
           const angle = Math.atan2(closestEnemy.y - ARENA_CENTER.y, closestEnemy.x - ARENA_CENTER.x);
-          const damage = 2.5 + this.wave * 0.7;
+          const damage = 3.5 + this.wave * 0.9;
           bullets.push({
             id: nextBulletId++,
             room: this.room,
             ownerId: "granny_statue",
             x: ARENA_CENTER.x + Math.cos(angle) * 45,
             y: ARENA_CENTER.y + Math.sin(angle) * 45,
-            vx: Math.cos(angle) * 620,
-            vy: Math.sin(angle) * 620,
+            vx: Math.cos(angle) * 760,
+            vy: Math.sin(angle) * 760,
             damage,
-            radius: 8,
+            radius: 9,
             character: "granny_plasma",
             bornAt: wallNow,
             expiresAt: wallNow + 1500,
@@ -1308,7 +1331,7 @@ function respawnObject(room, type) {
 
 const LEVEL_XP_THRESHOLDS = [0, 30, 75, 140, 220, 320, 450, 600, 800, 1000];
 for (let lvl = 11; lvl <= 100; lvl++) {
-  const prev = LEVEL_XP_THRESHOLDS[lvl - 1];
+  const prev = LEVEL_XP_THRESHOLDS[LEVEL_XP_THRESHOLDS.length - 1];
   const delta = 220 + (lvl - 10) * 28;
   LEVEL_XP_THRESHOLDS.push(prev + delta);
 }
