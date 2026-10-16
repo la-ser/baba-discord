@@ -1055,7 +1055,7 @@ class HordeGame {
             });
             if (enemy.hp <= 0) {
               p.score.kills = (p.score.kills || 0) + 1;
-              awardXp(p, enemy.xp);
+              awardXp(p, enemy.xp, true);
               io.to(this.room).emit("enemy_killed", {
                 enemyId: enemy.id,
                 type: enemy.type,
@@ -1109,7 +1109,7 @@ class HordeGame {
 
             if (enemy.hp <= 0) {
               p.score.kills = (p.score.kills || 0) + 1;
-              awardXp(p, enemy.xp);
+              awardXp(p, enemy.xp, true);
               io.to(this.room).emit("enemy_killed", {
                 enemyId: enemy.id,
                 type: enemy.type,
@@ -1427,7 +1427,7 @@ function respawnObject(room, type) {
 const LEVEL_XP_THRESHOLDS = [0, 30, 75, 140, 220, 320, 450, 600, 800, 1000];
 for (let lvl = 11; lvl <= 100; lvl++) {
   const prev = LEVEL_XP_THRESHOLDS[LEVEL_XP_THRESHOLDS.length - 1];
-  const delta = 220 + (lvl - 10) * 28;
+  const delta = 200 + (lvl - 10) * 12;
   LEVEL_XP_THRESHOLDS.push(prev + delta);
 }
 
@@ -2438,7 +2438,7 @@ io.on("connection", (socket) => {
   });
 });
 
-function awardXp(player, amount) {
+function awardXp(player, amount, shareAssist = false) {
   if (!player) return;
   player.xp = (player.xp || 0) + amount;
   const oldLevel = player.level || 1;
@@ -2467,6 +2467,20 @@ function awardXp(player, amount) {
       maxHealth: newMaxHp,
       unlockedMamaCyborg: !isHorde && newLevel === 10,
     });
+  }
+
+  // Co-op assist XP: distribute fair assist rewards to active teammates in Horde mode
+  if (shareAssist && isHorde && player.room) {
+    const roomPids = rooms.get(player.room) || [];
+    const assistXp = Math.max(1, Math.round(amount * 0.45));
+    for (const pid of roomPids) {
+      if (pid !== player.id) {
+        const teammate = players.get(pid);
+        if (teammate && teammate.active) {
+          awardXp(teammate, assistXp, false);
+        }
+      }
+    }
   }
 }
 
@@ -2765,7 +2779,7 @@ setInterval(() => {
           });
           if (isKill) {
             p.score.kills += 1;
-            awardXp(p, enemy.xp);
+            awardXp(p, enemy.xp, true);
             io.to(p.room).emit("enemy_killed", {
               enemyId: enemy.id,
               type: enemy.type,
@@ -3018,7 +3032,7 @@ setInterval(() => {
               const killer = players.get(bullet.ownerId);
               if (killer) {
                 killer.score.kills += 1;
-                awardXp(killer, enemy.xp);
+                awardXp(killer, enemy.xp, true);
               } else {
                 for (const pid of roomPlayers) {
                   const pl = players.get(pid);
