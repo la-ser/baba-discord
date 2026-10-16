@@ -255,6 +255,45 @@ const HORDE_CARDS = {
       player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.20;
     }
   },
+  weapon_heavy_caliber: {
+    id: "weapon_heavy_caliber",
+    category: "upgrade",
+    rarity: "common",
+    name: "High-Caliber Ordnance",
+    desc: "Load dense armor-piercing kinetic rounds: increases all bullet damage by +15% (stackable).",
+    icon: "💥",
+    faIcon: "fa-solid fa-burst",
+    condition: () => true,
+    apply: (player) => {
+      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.15;
+    }
+  },
+  weapon_piercing_core: {
+    id: "weapon_piercing_core",
+    category: "upgrade",
+    rarity: "uncommon",
+    name: "Tungsten Penetrator",
+    desc: "Reinforced tungsten carbide projectile cores: increases bullet damage by +18% (stackable).",
+    icon: "🎯",
+    faIcon: "fa-solid fa-bullseye",
+    condition: () => true,
+    apply: (player) => {
+      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.18;
+    }
+  },
+  weapon_hollow_point: {
+    id: "weapon_hollow_point",
+    category: "upgrade",
+    rarity: "rare",
+    name: "Hyper-Charge Capacitors",
+    desc: "Supercharged plasma capacitors: delivers lethal energy bursts increasing bullet damage by +25% (stackable).",
+    icon: "⚛️",
+    faIcon: "fa-solid fa-atom",
+    condition: () => true,
+    apply: (player) => {
+      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.25;
+    }
+  },
   weapon_rapid_fire: {
     id: "weapon_rapid_fire",
     category: "upgrade",
@@ -266,6 +305,45 @@ const HORDE_CARDS = {
     condition: () => true,
     apply: (player) => {
       player.fireRateMult = (player.fireRateMult || 1.0) * 0.85;
+    }
+  },
+  weapon_overclock_actuator: {
+    id: "weapon_overclock_actuator",
+    category: "upgrade",
+    rarity: "common",
+    name: "Overclocked Actuator",
+    desc: "Overclock mechanical bolt cycling: reduces firing delay by 12% for faster shooting (stackable).",
+    icon: "⚙️",
+    faIcon: "fa-solid fa-gauge-high",
+    condition: () => true,
+    apply: (player) => {
+      player.fireRateMult = (player.fireRateMult || 1.0) * 0.88;
+    }
+  },
+  weapon_lightweight_bolt: {
+    id: "weapon_lightweight_bolt",
+    category: "upgrade",
+    rarity: "common",
+    name: "Lightweight Bolt",
+    desc: "Ultra-light carbon-composite bolt: reduces firing interval by 10% (stackable).",
+    icon: "💨",
+    faIcon: "fa-solid fa-forward-fast",
+    condition: () => true,
+    apply: (player) => {
+      player.fireRateMult = (player.fireRateMult || 1.0) * 0.90;
+    }
+  },
+  weapon_twin_feed: {
+    id: "weapon_twin_feed",
+    category: "upgrade",
+    rarity: "rare",
+    name: "Twin-Feed Loader",
+    desc: "Dual-chamber high-speed pneumatic loader: increases firing rate by 20% (stackable).",
+    icon: "🔁",
+    faIcon: "fa-solid fa-arrows-spin",
+    condition: () => true,
+    apply: (player) => {
+      player.fireRateMult = (player.fireRateMult || 1.0) * 0.80;
     }
   },
 
