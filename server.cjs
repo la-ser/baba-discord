@@ -41,12 +41,12 @@ function getCapsuleClosestPoint(px, py, ox, oy, angle, halfLength) {
   };
 }
 const CHARACTER_STATS = {
-  granny: { width: 34, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
-  cyborg: { width: 91, height: 108, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
-  mama_cyborg: { width: 91, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
-  angry_granny: { width: 58, height: 108, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
-  sigmatom: { width: 186, height: 225, speed: 215, damage: 4.5, bulletRadius: 20, bulletSpeed: 1014, parryCooldown: 2250, maxHealth: 200 },
-  scientist: { width: 36, height: 36, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
+  granny: { width: 41, height: 43, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
+  cyborg: { width: 109, height: 130, speed: 175, damage: 2.25, bulletRadius: 6.5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
+  mama_cyborg: { width: 109, height: 130, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
+  angry_granny: { width: 70, height: 130, speed: 280, damage: 2.0, bulletRadius: 8, bulletSpeed: 480, parryCooldown: 4000, maxHealth: 50 },
+  sigmatom: { width: 223, height: 270, speed: 215, damage: 4.5, bulletRadius: 20, bulletSpeed: 1014, parryCooldown: 2250, maxHealth: 200 },
+  scientist: { width: 43, height: 43, speed: 255, damage: 1, bulletRadius: 5, bulletSpeed: 520, parryCooldown: 4500, maxHealth: 20 },
 };
 
 const ENEMY_CONFIG = {
