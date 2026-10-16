@@ -7,7 +7,7 @@
     "build": "vite build",
     "start": "node server.cjs",
     "deploy:sync": "powershell -ExecutionPolicy Bypass -File ./sync-deploy.ps1",
-    "test": "node tests/deployment.cjs && node tests/transport-probe.cjs && node tests/inventory.cjs && node tests/image-loader.cjs && node tests/connection-recovery.cjs && node tests/multiplayer.cjs && node tests/horde-stability.cjs && node tests/parties.cjs && node tests/party-network.cjs"
+    "test": "node tests/sprite-fallbacks.cjs && node tests/deployment.cjs && node tests/transport-probe.cjs && node tests/inventory.cjs && node tests/image-loader.cjs && node tests/connection-recovery.cjs && node tests/multiplayer.cjs && node tests/horde-stability.cjs && node tests/parties.cjs && node tests/party-network.cjs"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.4.0",

@@ -73,3 +73,13 @@ Run `npm test` for disk-write failure, case replay/restart, transport fallback i
 The hangar background is an optimized local WebP generated with the built-in image-generation tool. Source prompt: cinematic industrial defense hangar, cyan strip lights, red emergency accents, wet metal floor, dark left side for menu text, empty circular pedestal on the right, no characters or lettering. The runtime asset is `src/assets/hangar-menu.webp`; original artwork is `src/assets/hangar-menu.png`.
 
 Diagnostics finish at a heartbeat boundary so no live poll is aborted at the deadline. A 15-second probe can take about 20 seconds; a 30-second probe can take up to one heartbeat longer. Successful WebSocket probes use a normal close handshake. Earlier probe versions aborted pending polls at exactly 15/30 seconds, producing misleading premature-close and unknown-session messages. Existing PM2 log files remain where they are; use `pm2 logs Baba-Cyborg-DC --lines 100` to follow them across normal updates. See [PM2 process management](https://pm2.keymetrics.io/docs/usage/process-management/) and [log management](https://pm2.keymetrics.io/docs/usage/log-management/).
+
+## Sprite reliability in Discord
+
+The browser and Discord Activity use the same optimized, alpha-preserving runtime sprites in `src/assets/sprites`. The 42 common sprites total about 1.44 MB instead of 16.53 MB; dimensions are capped at 512px while original art and server collision sources remain unchanged. Regenerate them with `scripts/optimize-sprites.py` and Pillow when source art changes. Boss animation sheets retain their original dimensions so frame coordinates stay valid.
+
+Both canvas images and HTML images (including dynamically created turret/case cards) receive bounded retries. After three failed requests, the loader lazily imports an embedded copy of that individual sprite. The image is decoded from a data URL, avoiding another image-file request. Failed images can retry again when connectivity returns or the game reconnects. Detached canvas sprites and existing image event handlers remain supported. Empty image sources are ignored, and old asynchronous recovery results cannot overwrite a new selection.
+
+Browser QA can reproduce persistent image-request failures with `node --require ./tests/fixtures/block-images.cjs server.cjs` using an isolated `INVENTORY_DATA_DIR`; this fixture is test-only and is never loaded by production startup. Recovery tests also check the embedded Granny, enemy and turret bytes against their optimized assets. This verifies recovery under simulated file-request failures, not every Discord client or Activity proxy condition.
+
+Discord networking reference: https://discord.com/developers/docs/activities/development-guides/networking.

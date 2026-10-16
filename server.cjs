@@ -1970,14 +1970,6 @@ class HordeGame {
   }
 
   startNextWave(io, roomPlayerIds) {
-    // If any player hasn't placed their rewards before the next wave begins, auto-place them around Granny
-    for (const pid of roomPlayerIds) {
-      const p = players.get(pid);
-      if (p && p.pendingPlacements && p.pendingPlacements.length > 0) {
-        this.autoPlaceAllPending(p, io);
-      }
-    }
-
     this.wave += 1;
     this.waveState = "active";
     const activeCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
@@ -4078,6 +4070,7 @@ io.on("connection", (socket) => {
     if (length < 1) return;
     const direction = { x: dx / length, y: dy / length };
     p.lastShotAt = now;
+    p.facing = direction;
     p.protectedUntil = 0;
 
     // Grappler hook for Tom / Sigma Tom
@@ -4384,7 +4377,9 @@ setInterval(() => {
       if (length) {
         dx /= length;
         dy /= length;
-        p.facing = { x: dx, y: dy };
+        if (Date.now() - (p.lastShotAt || 0) >= 200) {
+          p.facing = { x: dx, y: dy };
+        }
       }
       speed = CHARACTER_STATS[p.character].speed;
     }
