@@ -234,7 +234,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "uncommon",
     name: "Tactical Zoom",
-    desc: "Upgrade targeting optics. Increases camera zoom to 1.5x on Tier 1 and 2.0x on Tier 2 (maximum 2 cards).",
+    desc: "Upgrade targeting optics. Zooms out camera perspective to 1.5x on Tier 1 and 2.0x on Tier 2 to see more of the map (maximum 2 cards).",
     icon: "🔭",
     faIcon: "fa-solid fa-magnifying-glass-plus",
     condition: (player, horde) => (player.zoomLevel || 0) < 2,
