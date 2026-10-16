@@ -212,7 +212,7 @@ const HORDE_CARDS = {
     category: "ability",
     rarity: "rare",
     name: "Dash Thrusters",
-    desc: "Unlock Spacebar Dash. Burst forward with a high-speed surge to escape danger.",
+    desc: "Unlock Spacebar Dash. Burst forward with high-speed thrusters to stun enemies you dash through for 3 seconds.",
     icon: "⚡",
     faIcon: "fa-solid fa-bolt-lightning",
     condition: (player, horde) => !player.hasDash,
@@ -328,7 +328,7 @@ const HORDE_CARDS = {
     category: "object",
     rarity: "uncommon",
     name: "Cryo Freeze Trap",
-    desc: "Deploy a floor trap that freezes any enemy walking over it for 5 seconds.",
+    desc: "Deploy a cryo floor trap. When triggered, it creates a 5-second sub-zero freeze zone that freezes every enemy who enters or touches it.",
     icon: "❄️",
     faIcon: "fa-solid fa-snowflake",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "trap").length < 6,
@@ -503,6 +503,7 @@ class HordeGame {
       dodgeVx: 0,
       dodgeVy: 0,
       frozenUntil: 0,
+      stunnedUntil: 0,
       x,
       y,
       facing: { x: -Math.cos(angle), y: -Math.sin(angle) },
@@ -759,6 +760,7 @@ class HordeGame {
     // 5. Enemy Dodge AI
     for (const enemy of this.enemies) {
       if (!enemy.hasDodge || wallNow < enemy.dodgeReadyAt || wallNow < enemy.dodgeUntil) continue;
+      if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) continue;
       for (const b of bullets) {
         if (b.room !== this.room) continue;
         const bSpeed = Math.hypot(b.vx, b.vy);
@@ -791,21 +793,25 @@ class HordeGame {
     for (let ei = this.enemies.length - 1; ei >= 0; ei--) {
       const enemy = this.enemies[ei];
 
-      // Frozen check
-      if (enemy.frozenUntil && enemy.frozenUntil > wallNow) {
+      // Frozen or Stunned check
+      if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) {
         continue;
       }
 
       // Check interaction with placed traps (Expanded cryo field)
       for (const obj of this.placedObjects) {
-        if (obj.type === "trap" && obj.state === "ready") {
-          const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
-          const triggerDist = (obj.radius || 60) + enemy.radius;
-          if (d <= triggerDist) {
+        if (obj.type !== "trap") continue;
+        const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
+        const triggerDist = (obj.radius || 60) + enemy.radius;
+        if (d <= triggerDist) {
+          if (obj.state === "ready") {
+            // First enemy triggers the trap, activating the 5.0s cryo field
             obj.state = "frozen";
-            obj.frozenEnemyId = enemy.id;
             obj.frozenUntil = wallNow + 5000;
+            obj.frozenEnemyId = enemy.id;
             enemy.frozenUntil = wallNow + 5000;
+            enemy.recoilVx = 0;
+            enemy.recoilVy = 0;
             io.to(this.room).emit("trap_triggered", {
               trapId: obj.id,
               enemyId: enemy.id,
@@ -813,11 +819,26 @@ class HordeGame {
               y: obj.y,
             });
             break;
+          } else if (obj.state === "frozen" && wallNow < obj.frozenUntil) {
+            // Trap is currently activated for 5 seconds: freeze every enemy touching it!
+            if (!enemy.frozenUntil || enemy.frozenUntil <= wallNow) {
+              enemy.frozenUntil = wallNow + 5000;
+              enemy.recoilVx = 0;
+              enemy.recoilVy = 0;
+              io.to(this.room).emit("enemy_frozen", {
+                trapId: obj.id,
+                enemyId: enemy.id,
+                x: enemy.x,
+                y: enemy.y,
+                duration: 5000,
+              });
+            }
+            break;
           }
         }
       }
 
-      if (enemy.frozenUntil && enemy.frozenUntil > wallNow) {
+      if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) {
         continue;
       }
 
@@ -1032,9 +1053,64 @@ class HordeGame {
           continue; // Enemy avoided during tactical dodge roll; cannot deal damage to player
         }
 
-        if (p.protectedUntil > wallNow) continue;
+        // 3. Tactical Dash active -> Strike, surge through, and STUN enemies for 3 seconds
+        const isDashing = wallNow < (p.dashUntil || 0);
+        if (isDashing && pDist <= enemy.radius + pRadius + 28) {
+          if (!enemy.lastDashHits) enemy.lastDashHits = new Map();
+          if (enemy.lastDashHits.get(p.id) !== p.dashId) {
+            enemy.lastDashHits.set(p.id, p.dashId);
+            const dmgMult = getPlayerDamageMultiplier(p);
+            const dashDmg = Math.round((3.2 + (p.level || 1) * 0.22) * dmgMult * 10) / 10;
+            const dX = p.dashDirection?.x || ((enemy.x - p.x) / (pDist || 1));
+            const dY = p.dashDirection?.y || ((enemy.y - p.y) / (pDist || 1));
+            enemy.x += dX * 24;
+            enemy.y += dY * 24;
+            enemy.recoilVx += dX * 240;
+            enemy.recoilVy += dY * 240;
+            enemy.hp -= dashDmg;
 
-        // 3. Melee damage to player
+            // STUN for 3 seconds (3000ms)
+            const stunDuration = 3000;
+            enemy.stunnedUntil = Math.max(enemy.stunnedUntil || 0, wallNow + stunDuration);
+
+            io.to(p.id).emit("hit_marker", { targetId: "enemy_" + enemy.id, headshot: false });
+            io.to(this.room).emit("enemy_stunned", {
+              enemyId: enemy.id,
+              duration: stunDuration,
+              x: enemy.x,
+              y: enemy.y,
+            });
+            io.to(this.room).emit("enemy_hit", {
+              enemyId: enemy.id,
+              damage: dashDmg,
+              hp: Math.max(0, enemy.hp),
+              maxHp: enemy.maxHp,
+              x: enemy.x,
+              y: enemy.y,
+            });
+
+            if (enemy.hp <= 0) {
+              p.score.kills = (p.score.kills || 0) + 1;
+              awardXp(p, enemy.xp);
+              io.to(this.room).emit("enemy_killed", {
+                enemyId: enemy.id,
+                type: enemy.type,
+                x: enemy.x,
+                y: enemy.y,
+                killerId: p.id,
+              });
+              this.enemies.splice(ei, 1);
+              enemyKilledThisTick = true;
+              break;
+            }
+          }
+          continue; // Enemy stunned and passed through by dash; cannot deal melee damage to dashing player
+        }
+
+        if (p.protectedUntil > wallNow) continue;
+        if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) continue;
+
+        // 4. Melee damage to player
         if (pDist <= enemy.radius + pRadius + 2) {
           if (wallNow - enemy.lastPlayerAttackAt >= enemy.attackCooldown) {
             enemy.lastPlayerAttackAt = wallNow;
@@ -3268,6 +3344,7 @@ setInterval(() => {
         facing: e.facing,
         dodging: wallNow < e.dodgeUntil,
         frozen: Boolean(e.frozenUntil && wallNow < e.frozenUntil),
+        stunned: Boolean(e.stunnedUntil && wallNow < e.stunnedUntil),
       })) : [],
       objects: isHordeRoom ? [] : (roomObjects.get(room) || []).map((o) => ({
         id: o.id,
