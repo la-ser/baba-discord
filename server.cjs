@@ -5684,6 +5684,14 @@ setInterval(() => {
     });
   }
 }, 1000 / 60);
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Cannot start: port ${PORT} is already occupied. PORT was resolved from ${path.join(__dirname, ".env")} first, then the process environment. Stop the duplicate service or set a free PORT in that .env and update your tunnel target. Use ecosystem.config.js for a single game process.`);
+    process.exit(78);
+  }
+  console.error("Game server failed to listen:", err);
+  process.exit(1);
+});
 server.listen(PORT, "0.0.0.0", () =>
   console.log(`Discord Activity server ready at http://localhost:${PORT}`),
 );
