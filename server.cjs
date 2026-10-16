@@ -909,6 +909,9 @@ class HordeGame {
           if (this.baseHealth <= 0) {
             this.waveState = "game_over";
             this.intermissionUntil = wallNow + 6500;
+            this.enemies = [];
+            clearTimeout(this.upgradeTimeout);
+            this.pendingPlayersToChoose.clear();
             io.to(this.room).emit("base_destroyed", { wave: this.wave });
           }
         }
@@ -1116,15 +1119,33 @@ class HordeGame {
         this.trapRecoveryTime = 5000;
         clearTimeout(this.upgradeTimeout);
         this.pendingPlayersToChoose.clear();
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          if (bullets[i].room === this.room) bullets.splice(i, 1);
+        }
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
-          if (p && p.active) {
+          if (p) {
+            p.xp = 0;
+            p.level = 1;
             p.health = 20;
             p.hasDash = false;
             p.hasDodge = false;
             p.pendingPlacements = [];
+            p.deadSince = 0;
+            p.protectedUntil = wallNow + SPAWN_PROTECTION;
             p.x = ARENA_CENTER.x + (Math.random() - 0.5) * 180;
             p.y = ARENA_CENTER.y + (Math.random() - 0.5) * 180;
+            if (p.score) {
+              p.score.kills = 0;
+              p.score.deaths = 0;
+            }
+            io.to(p.id).emit("xp_update", {
+              xp: 0,
+              level: 1,
+              lost: true,
+              demoted: false,
+              nextLevelXp: getXpForNextLevel(1, true),
+            });
           }
         }
         io.to(this.room).emit("horde_restarted", { wave: 1, baseHealth: this.baseHealth });
@@ -1830,7 +1851,9 @@ io.on("connection", (socket) => {
 
     if (validMode === "horde") {
       p.character = "scientist";
-      p.health = getPlayerMaxHealth(p);
+      p.xp = 0;
+      p.level = 1;
+      p.health = 20;
       p.hasDash = false;
       p.hasDodge = false;
       p.pendingPlacements = [];
@@ -1838,6 +1861,13 @@ io.on("connection", (socket) => {
       p.x = spawn.x;
       p.y = spawn.y;
       initHordeGame(newRoom);
+      io.to(p.id).emit("xp_update", {
+        xp: 0,
+        level: 1,
+        lost: false,
+        demoted: false,
+        nextLevelXp: getXpForNextLevel(1, true),
+      });
     } else {
       p.character = p.lastFfaCharacter || "granny";
       p.health = getPlayerMaxHealth(p);
