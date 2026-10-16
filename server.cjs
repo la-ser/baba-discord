@@ -308,18 +308,18 @@ const HORDE_CARDS = {
   },
 
   // Object Placement Cards
-  object_wall: {
-    id: "object_wall",
+  object_barricade: {
+    id: "object_barricade",
     category: "object",
     rarity: "common",
-    name: "Reinforced Barricade",
-    desc: "Deploy a sturdy defensive wall that blocks enemy pathing and absorbs melee attacks.",
-    icon: "🧱",
+    name: "Barricade",
+    desc: "Deploy a sturdy defensive barricade that blocks enemy pathing and absorbs hostile melee attacks.",
+    icon: "🛡️",
     faIcon: "fa-solid fa-shield-halved",
-    condition: (player, horde) => horde.placedObjects.filter(o => o.type === "wall").length < 12,
+    condition: (player, horde) => horde.placedObjects.filter(o => o.type === "wall" || o.type === "barricade").length < 12,
     apply: (player, horde) => {
       player.pendingPlacements = player.pendingPlacements || [];
-      player.pendingPlacements.push("wall");
+      player.pendingPlacements.push("barricade");
     }
   },
   object_turret: {
@@ -405,6 +405,7 @@ const HORDE_CARDS = {
     }
   }
 };
+HORDE_CARDS.object_wall = HORDE_CARDS.object_barricade;
 
 class HordeGame {
   constructor(room) {
@@ -530,9 +531,12 @@ class HordeGame {
 
   generateCardOptions(player) {
     const available = [];
+    const seenCardIds = new Set();
     for (const card of Object.values(HORDE_CARDS)) {
+      if (!card || seenCardIds.has(card.id)) continue;
+      seenCardIds.add(card.id);
       try {
-        if (card && typeof card.condition === "function" && card.condition(player, this)) {
+        if (typeof card.condition === "function" && card.condition(player, this)) {
           available.push(card);
         }
       } catch (e) {
@@ -543,7 +547,7 @@ class HordeGame {
     if (available.length < 3) {
       if (!available.some(c => c.id === "granny_turret")) available.push(HORDE_CARDS.granny_turret);
       if (!available.some(c => c.id === "granny_heal_aura")) available.push(HORDE_CARDS.granny_heal_aura);
-      if (!available.some(c => c.id === "object_wall")) available.push(HORDE_CARDS.object_wall);
+      if (!available.some(c => c.id === "object_wall" || c.id === "object_barricade")) available.push(HORDE_CARDS.object_barricade);
       if (!available.some(c => c.id === "object_turret")) available.push(HORDE_CARDS.object_turret);
       if (!available.some(c => c.id === "object_trap")) available.push(HORDE_CARDS.object_trap);
     }
@@ -904,11 +908,11 @@ class HordeGame {
       // Check collision with placed walls and turrets
       for (let oi = this.placedObjects.length - 1; oi >= 0; oi--) {
         const obj = this.placedObjects[oi];
-        if (obj.type === "wall" || obj.type === "turret") {
+        if (obj.type === "wall" || obj.type === "barricade" || obj.type === "turret") {
           let cx = obj.x;
           let cy = obj.y;
           let minD = enemy.radius + obj.radius;
-          if (obj.type === "wall") {
+          if (obj.type === "wall" || obj.type === "barricade") {
             const pt = getCapsuleClosestPoint(enemy.x, enemy.y, obj.x, obj.y, obj.angle || 0, 62);
             cx = pt.cx;
             cy = pt.cy;
@@ -2054,25 +2058,29 @@ io.on("connection", (socket) => {
     const x = Number(payload?.x);
     const y = Number(payload?.y);
     const angle = Number(payload?.angle) || 0;
-    if (!["wall", "turret", "trap"].includes(type)) return;
+    if (!["wall", "barricade", "turret", "trap"].includes(type)) return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
     const distFromCenter = Math.hypot(x - ARENA_CENTER.x, y - ARENA_CENTER.y);
     if (distFromCenter > ARENA_RADIUS - 50 || distFromCenter < 65) return;
 
-    const idx = (p.pendingPlacements || []).indexOf(type);
+    let idx = (p.pendingPlacements || []).indexOf(type);
+    if (idx === -1 && (type === "barricade" || type === "wall")) {
+      idx = (p.pendingPlacements || []).findIndex(t => t === "barricade" || t === "wall");
+    }
     if (idx === -1) return;
     p.pendingPlacements.splice(idx, 1);
 
+    const isBarricade = type === "wall" || type === "barricade";
     const newObj = {
       id: horde.nextObjectId++,
-      type,
+      type: isBarricade ? "barricade" : type,
       ownerId: p.id,
       x: Math.round(x),
       y: Math.round(y),
-      radius: type === "wall" ? 30 : (type === "turret" ? 22 : 60),
-      hp: type === "wall" ? 60 : (type === "turret" ? 28 : 100),
-      maxHp: type === "wall" ? 60 : (type === "turret" ? 28 : 100),
+      radius: isBarricade ? 30 : (type === "turret" ? 22 : 60),
+      hp: isBarricade ? 60 : (type === "turret" ? 28 : 100),
+      maxHp: isBarricade ? 60 : (type === "turret" ? 28 : 100),
       angle: Number.isFinite(angle) ? angle : 0,
       state: "ready",
       lastShotAt: 0,
