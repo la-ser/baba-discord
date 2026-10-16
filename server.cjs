@@ -35,11 +35,14 @@ io.engine.on("connection_error", error => {
 });
 io.engine.on("connection", connection => {
   const started = Date.now();
+  let websocketCloseCode;
+  const observeTransport = transport => transport.socket?.prependListener('close', code => { websocketCloseCode = code; });
+  observeTransport(connection.transport); connection.on('upgrade', observeTransport);
   connection.on("close", (reason, description) => {
-    if (reason === "transport error" || (reason === "transport close" && Date.now() - started < 15000)) {
+    if (reason === "transport error" || (reason === "transport close" && connection.transport?.name === "websocket" && websocketCloseCode !== 1000 && websocketCloseCode !== 1001)) {
       if (reason === "transport error") transportStats[connection.transport?.name === "websocket" ? "websocketErrors" : "pollingErrors"]++;
       console.warn("[transport closed]", JSON.stringify({
-        transport: connection.transport?.name, reason, ageMs: Date.now() - started,
+        transport: connection.transport?.name, reason, ageMs: Date.now() - started, websocketCloseCode,
         detail: description?.message, code: description?.code,
         cause: description?.description?.message || description?.description?.code,
       }));

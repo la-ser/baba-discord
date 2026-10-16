@@ -6,6 +6,8 @@ module.exports = {
     exec_mode: "fork",
     instances: 1,
     autorestart: true,
+    merge_logs: true,
+    time: true,
     restart_delay: 3000,
     max_restarts: 10,
     stop_exit_codes: [78],

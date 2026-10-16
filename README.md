@@ -44,7 +44,7 @@ Image requests retry transient failures three times. The base scientist sprite i
 
 ## Raspberry Pi update
 
-The deployment updater uses the canonical PM2 name Baba-Cyborg-DC. It deletes PM2 entries only when their resolved script path matches this checkout's server.cjs, then starts ecosystem.config.js in fork mode. This replaces older cluster settings and duplicate names without stopping other projects. It verifies the process ID, build ID, configured port and online state before saving PM2. Existing .env values are preserved.
+The deployment updater uses the canonical PM2 name Baba-Cyborg-DC. Normal updates restart the existing fork entry by numeric ID, preserving its ID, restart history and log paths. It only creates an entry when none exists. Duplicate entries, old cluster settings or a conflicting name stop the update with an explicit message; the updater never deletes PM2 entries. It verifies the process ID, build ID, configured port and online state before saving PM2. Existing .env values are preserved.
 
 For the current Pi setup, set PORT=2323 in the deployed .env and target http://127.0.0.1:2323 from cloudflared. Run bash update.sh from the deployed repository after pushing the updated deployment bundle. The /health response reports build and processId for deployment verification and disables caching.
 
@@ -71,3 +71,5 @@ Horde lobbies reserve dropped players' seats for 45 seconds and restore their pa
 Run `npm test` for disk-write failure, case replay/restart, transport fallback in both directions, multiplayer movement, horde simulation, eight-player party limits and real-network party-reconnect checks. Tests use isolated inventory directories.
 
 The hangar background is an optimized local WebP generated with the built-in image-generation tool. Source prompt: cinematic industrial defense hangar, cyan strip lights, red emergency accents, wet metal floor, dark left side for menu text, empty circular pedestal on the right, no characters or lettering. The runtime asset is `src/assets/hangar-menu.webp`; original artwork is `src/assets/hangar-menu.png`.
+
+Diagnostics finish at a heartbeat boundary so no live poll is aborted at the deadline. A 15-second probe can take about 20 seconds; a 30-second probe can take up to one heartbeat longer. Successful WebSocket probes use a normal close handshake. Earlier probe versions aborted pending polls at exactly 15/30 seconds, producing misleading premature-close and unknown-session messages. Existing PM2 log files remain where they are; use `pm2 logs Baba-Cyborg-DC --lines 100` to follow them across normal updates. See [PM2 process management](https://pm2.keymetrics.io/docs/usage/process-management/) and [log management](https://pm2.keymetrics.io/docs/usage/log-management/).

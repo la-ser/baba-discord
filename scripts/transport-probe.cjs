@@ -5,7 +5,7 @@ async function probeTransport(base, transport, durationMs = 30000) {
   if (transport === 'websocket') return new Promise(resolve => {
     const ws = new WebSocket(base.replace(/^http/, 'ws') + '/socket.io/?EIO=4&transport=websocket', { handshakeTimeout: 7000 });
     let opened = false, settled = false, heartbeats = 0;
-    const finish = error => { if (settled) return; settled = true; clearTimeout(timer); ws.terminate(); resolve({ transport, ok: opened && !error, elapsedMs: Date.now() - started, heartbeats, ...(error ? { error } : {}) }); };
+    const finish = error => { if (settled) return; settled = true; clearTimeout(timer); if (!error && ws.readyState === WebSocket.OPEN) { ws.close(1000, 'Diagnostic complete'); const cleanup = setTimeout(() => ws.terminate(), 2000); cleanup.unref?.(); ws.once('close', () => clearTimeout(cleanup)); } else ws.terminate(); resolve({ transport, ok: opened && !error, elapsedMs: Date.now() - started, heartbeats, ...(error ? { error } : {}) }); };
     const timer = setTimeout(() => finish(opened ? null : 'No Engine.IO handshake'), durationMs);
     ws.on('message', data => { const message = String(data); if (message.startsWith('0')) opened = true; if (message === '2') { heartbeats++; ws.send('3'); } });
     ws.on('error', error => finish(error.message));
@@ -20,14 +20,17 @@ async function probeTransport(base, transport, durationMs = 30000) {
     const hello = JSON.parse(packet.slice(1)); session = endpoint + '&sid=' + encodeURIComponent(hello.sid);
     let heartbeats = 0;
     while (Date.now() - started < durationMs) {
-      const remaining = durationMs - (Date.now() - started);
       let response;
-      try { response = await fetch(session, { signal: AbortSignal.timeout(Math.min(hello.pingInterval + hello.pingTimeout + 1000, remaining)) }); }
-      catch (error) { if (Date.now() - started >= durationMs - 50) break; throw error; }
+      try { response = await fetch(session, { signal: AbortSignal.timeout(hello.pingInterval + hello.pingTimeout + 1000) }); }
+      catch (error) { throw error; }
       const packets = await response.text();
       if (!response.ok) throw new Error('Session GET HTTP ' + response.status);
+      if (packets.split('\x1e').includes('1')) throw new Error('Server closed the polling session before test completed');
       if (packets.split('\x1e').includes('2')) {
         heartbeats++;
+        // Finish between polls, after consuming the response. Aborting a live GET
+        // produces a false transport error and invalidates the session before cleanup.
+        if (Date.now() - started >= durationMs) break;
         const pong = await fetch(session, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: '3', signal: AbortSignal.timeout(7000) });
         if (!pong.ok) throw new Error('Session POST HTTP ' + pong.status);
       }

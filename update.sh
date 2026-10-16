@@ -15,25 +15,8 @@ if [ ! -f ecosystem.config.js ]; then
   exit 1
 fi
 
-# Replace only processes whose script belongs to this exact checkout.
-# A restart alone preserves old cluster mode and instance counts.
-PROCESS_IDS="$(pm2 jlist | node -e '
-const fs = require("fs"), path = require("path");
-let input = "";
-process.stdin.on("data", chunk => input += chunk);
-process.stdin.on("end", () => {
-  const target = fs.realpathSync(path.resolve("server.cjs"));
-  const ids = JSON.parse(input).filter(p => {
-    try { return fs.realpathSync(p.pm2_env.pm_exec_path) === target; }
-    catch { return false; }
-  }).map(p => p.pm_id);
-  process.stdout.write(ids.join(" "));
-});
-')"
-for id in $PROCESS_IDS; do
-  pm2 delete "$id"
-done
-pm2 start ecosystem.config.js --only "$APP_NAME"
+# Reuse the existing entry; never delete processes during a normal update.
+node scripts/restart-game.cjs
 
 # Check both PM2 and HTTP; an unrelated listener must not count as success.
 node scripts/verify-deployment.cjs
