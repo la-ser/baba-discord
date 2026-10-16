@@ -31,6 +31,22 @@ function getGuestInventory(socketId) {
 const app = express(),
   server = http.createServer(app),
   io = new Server(server);
+// Keep transport failures visible without logging OAuth tokens or handshake payloads.
+io.engine.on("connection_error", error => {
+  console.warn("[transport handshake]", JSON.stringify({ code: error.code, message: error.message, detail: error.context?.message }));
+});
+io.engine.on("connection", connection => {
+  const started = Date.now();
+  connection.on("close", (reason, description) => {
+    if (reason === "transport error" || (reason === "transport close" && Date.now() - started < 15000)) {
+      console.warn("[transport closed]", JSON.stringify({
+        transport: connection.transport?.name, reason, ageMs: Date.now() - started,
+        detail: description?.message, code: description?.code,
+        cause: description?.description?.message || description?.description?.code,
+      }));
+    }
+  });
+});
 const WIDTH = 3600,
   HEIGHT = 3600,
   ARENA_CENTER = { x: 1800, y: 1800 },

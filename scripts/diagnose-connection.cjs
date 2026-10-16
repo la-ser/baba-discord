@@ -25,11 +25,14 @@ async function probe(label, base) {
   } catch (e) { result.polling = "FAIL: " + e.message; }
   result.websocket = await new Promise(resolve => {
     let finished = false, authenticated = false;
+    const started = Date.now();
+    const frames = [];
     const ws = new WebSocket(base.replace(/^http/, "ws") + "/socket.io/?EIO=4&transport=websocket", { handshakeTimeout: 5000 });
-    const finish = message => { if (finished) return; finished = true; clearTimeout(timer); ws.close(); resolve(message); };
+    const finish = message => { if (finished) return; finished = true; clearTimeout(timer); ws.close(); resolve({ result: message, authenticated, elapsedMs: Date.now() - started, frames }); };
     const timer = setTimeout(() => finish(authenticated && ws.readyState === WebSocket.OPEN ? "PASS: authenticated and stable for 5 seconds" : "FAIL: did not authenticate"), 5000);
     ws.on("message", data => {
       const p = String(data);
+      if (frames.length < 8) frames.push(p.slice(0, 2));
       if (p.startsWith("0")) ws.send('40{"accessToken":"dev-token","instanceId":"transport-diagnostic"}');
       if (p.startsWith("40")) authenticated = true;
       if (p === "2") ws.send("3");
@@ -39,6 +42,7 @@ async function probe(label, base) {
   });
   return result;
 }
+console.log("Runtime:", JSON.stringify({ node: process.version, arch: process.arch, ws: require("ws/package.json").version, socketIo: require("socket.io/package.json").version }));
 Promise.all(Object.entries(targets).map(([label, base]) => probe(label, base))).then(results => {
   console.log(JSON.stringify(results, null, 2));
   console.log("If local passes and public fails, inspect cloudflared logs: journalctl -u cloudflared --since '5 minutes ago' --no-pager");

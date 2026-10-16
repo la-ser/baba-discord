@@ -49,3 +49,5 @@ The deployment updater uses the canonical PM2 name Baba-Cyborg-DC. It deletes PM
 For the current Pi setup, set PORT=2323 in the deployed .env and target http://127.0.0.1:2323 from cloudflared. Run bash update.sh from the deployed repository after pushing the updated deployment bundle. The /health response reports build and processId for deployment verification and disables caching.
 
 Run node scripts/diagnose-connection.cjs on the Pi to compare local and public HTTP, polling sessions and WebSocket stability. If only the public target fails, inspect cloudflared logs at the same time; a 502 alone does not establish a bandwidth bottleneck.
+
+If WebSockets connect then drop, the browser now falls back to polling for the remainder of that page session. This also prevents repeated WebSocket upgrade attempts. Server transport errors are logged with [transport handshake] / [transport closed] without authentication payloads. Code 1006 means the WebSocket ended without a close frame; it does not establish the underlying cause.
