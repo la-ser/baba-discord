@@ -1,5 +1,5 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, ".env"), override: true });
+require("dotenv").config({ path: path.join(__dirname, ".env"), override: false });
 const express = require("express"),
   http = require("http");
 const { Server } = require("socket.io");
@@ -3320,11 +3320,11 @@ app.post("/api/token", async (req, res) => {
 });
 app.use(
   express.static(path.join(__dirname, "dist"), {
-    maxAge: "1y",
-    immutable: true,
+    maxAge: "1h",
     setHeaders(res, filePath) {
       // The HTML points at hashed bundles and must never outlive a deployment.
       // Hashed JS and media remain safe to cache indefinitely.
+      if (filePath.startsWith(path.join(__dirname, "dist", "assets") + path.sep)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       if (path.extname(filePath).toLowerCase() === ".html") {
         res.set({
           "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -3368,6 +3368,7 @@ io.use(async (socket, next) => {
     );
   try {
     const r = await fetch("https://discord.com/api/v10/users/@me", {
+      signal: AbortSignal.timeout(10000),
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!r.ok) return next(new Error("Discord login expired or invalid"));
@@ -3501,6 +3502,7 @@ io.on("connection", (socket) => {
     if (typeof acknowledge === "function") acknowledge(Date.now());
   });
   socket.on("input", (payload) => {
+    if (Number.isSafeInteger(payload?.sequence) && payload.sequence <= p.lastInputSeq) return;
     const keys = payload?.keys || payload;
     if (!keys || typeof keys !== "object") return;
     for (const k of ["up", "down", "left", "right"])
