@@ -2598,10 +2598,14 @@
         background: var(--card-bg, linear-gradient(175deg, rgba(18, 24, 40, 0.94) 0%, rgba(8, 12, 22, 0.98) 100%));
         border: 1.5px solid var(--card-border, rgba(255, 255, 255, 0.14));
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 25px var(--card-shadow, rgba(0, 0, 0, 0.4));
-        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease, opacity 0.3s ease;
-        transform-style: preserve-3d;
+        transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease, opacity 0.3s ease;
+        transform-origin: center center;
         overflow: hidden;
         animation: cardFlyIn 0.5s cubic-bezier(0.18, 1.25, 0.32, 1) backwards;
+      }
+      .rpg-card:hover {
+        transform: scale(1.035);
+        z-index: 5;
       }
       @keyframes cardFlyIn {
         0% {
@@ -2867,21 +2871,33 @@
         justify-content: center;
         gap: 8px;
         cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, transform 0.15s ease;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+      .rpg-select-btn i {
+        transition: transform 0.2s ease;
       }
       .rpg-card:hover .rpg-select-btn {
         background: linear-gradient(90deg, var(--card-accent), #ff8c00);
         color: #060913;
         border-color: var(--card-accent);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 20px var(--card-shadow);
-        transform: translateY(-2px);
       }
       .rpg-card.rarity-uncommon:hover .rpg-select-btn {
         background: linear-gradient(90deg, #00e5ff, #00b4d8);
       }
       .rpg-card.rarity-common:hover .rpg-select-btn {
         background: linear-gradient(90deg, #38bdf8, #0284c7);
+      }
+      .rpg-select-btn:hover {
+        filter: brightness(1.15);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 26px var(--card-accent);
+      }
+      .rpg-select-btn:hover i {
+        transform: translateX(4px);
+      }
+      .rpg-select-btn:active {
+        transform: scale(0.98);
       }
 
       /* Selection & Discard state */
@@ -3125,7 +3141,7 @@
         color: #fff;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-DQiISm1Q.js"></script>
+    <script type="module" crossorigin src="/assets/index-DuV11w-A.js"></script>
   </head>
   <body>
     <div id="game-shell">
