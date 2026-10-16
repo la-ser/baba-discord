@@ -275,7 +275,7 @@ const HORDE_CARDS = {
     category: "utility",
     rarity: "common",
     name: "Granny Defense Cannon",
-    desc: "Granny statue auto-fires rapid plasma bolts (1.6s reload, 720px range). Stacking accelerates fire rate down to 0.45s.",
+    desc: "Granny statue auto-fires plasma bolts (1.8s reload, 720px range). Stacking accelerates fire rate down to 0.65s.",
     icon: "🔱",
     faIcon: "fa-solid fa-crosshairs",
     condition: (player, horde) => true,
@@ -1098,7 +1098,7 @@ class HordeGame {
 
     // 1. Granny Core Cannon firing
     if (this.grannyTurretLevel > 0 && this.waveState === "active") {
-      const cooldown = Math.max(450, 1600 - (this.grannyTurretLevel - 1) * 260);
+      const cooldown = Math.max(650, 1800 - (this.grannyTurretLevel - 1) * 220);
       if (wallNow - (this.lastGrannyShotAt || 0) >= cooldown) {
         let closestEnemy = null;
         let closestDist = 720;
@@ -1129,7 +1129,7 @@ class HordeGame {
         if (closestEnemy) {
           this.lastGrannyShotAt = wallNow;
           const angle = Math.atan2(closestEnemy.y - ARENA_CENTER.y, closestEnemy.x - ARENA_CENTER.x);
-          const damage = 3.5 + this.wave * 0.9;
+          const damage = Math.round((2.2 + this.wave * 0.25) * 10) / 10;
           bullets.push({
             id: nextBulletId++,
             room: this.room,
