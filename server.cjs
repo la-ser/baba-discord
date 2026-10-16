@@ -229,6 +229,19 @@ const HORDE_CARDS = {
     condition: (player, horde) => !player.hasDodge,
     apply: (player, horde) => { player.hasDodge = true; }
   },
+  player_zoom: {
+    id: "player_zoom",
+    category: "upgrade",
+    rarity: "uncommon",
+    name: "Tactical Zoom",
+    desc: "Upgrade targeting optics. Increases camera zoom to 1.5x on Tier 1 and 2.0x on Tier 2 (maximum 2 cards).",
+    icon: "🔭",
+    faIcon: "fa-solid fa-magnifying-glass-plus",
+    condition: (player, horde) => (player.zoomLevel || 0) < 2,
+    apply: (player, horde) => {
+      player.zoomLevel = Math.min(2, (player.zoomLevel || 0) + 1);
+    }
+  },
 
   // Granny Utility Cards (Stackable team upgrades)
   granny_turret: {
@@ -577,6 +590,7 @@ class HordeGame {
       category: card.category,
       hasDash: player.hasDash === true,
       hasDodge: player.hasDodge === true,
+      zoomLevel: player.zoomLevel || 0,
     };
     const targetSocket = io.sockets.sockets.get(player.id);
     if (targetSocket) {
@@ -1229,6 +1243,7 @@ class HordeGame {
             p.health = 20;
             p.hasDash = false;
             p.hasDodge = false;
+            p.zoomLevel = 0;
             p.pendingPlacements = [];
             p.deadSince = 0;
             p.protectedUntil = wallNow + SPAWN_PROTECTION;
@@ -1859,6 +1874,7 @@ io.on("connection", (socket) => {
     soundwaveAngle: 0,
     hasDash: currentMode !== "horde",
     hasDodge: false,
+    zoomLevel: 0,
     pendingPlacements: [],
     lastSoundwavePulseAt: 0,
   };
@@ -1955,6 +1971,7 @@ io.on("connection", (socket) => {
       p.health = 20;
       p.hasDash = false;
       p.hasDodge = false;
+      p.zoomLevel = 0;
       p.pendingPlacements = [];
       const spawn = getPlayerSpawn("scientist", newRoom);
       p.x = spawn.x;
@@ -1972,6 +1989,7 @@ io.on("connection", (socket) => {
       p.health = getPlayerMaxHealth(p);
       p.hasDash = true;
       p.hasDodge = false;
+      p.zoomLevel = 0;
       p.pendingPlacements = [];
       const spawn = getPlayerSpawn(p.character, newRoom);
       p.x = spawn.x;
@@ -3272,6 +3290,7 @@ setInterval(() => {
         level: p.level,
         hasDash: p.hasDash === true,
         hasDodge: p.hasDodge === true,
+        zoomLevel: p.zoomLevel || 0,
       }));
     const leaderboard = [...(roomScores.get(room)?.values() || [])]
       .filter((score) => score.socketId && players.has(score.socketId))
