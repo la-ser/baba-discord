@@ -14,17 +14,9 @@ const {
 } = require("./turretConfig.cjs");
 const { BABY_CYBORG_CONFIG } = require("./babyCyborgConfig.cjs");
 const guestInventories = new Map();
-function getGuestInventory(socketId) {
+function getGuestInventory(socketId, inventoryId) {
   if (!guestInventories.has(socketId)) {
-    guestInventories.set(socketId, {
-      discordId: "guest",
-      keys: 1,
-      fragments: 0,
-      unlockedTurrets: ["default"],
-      equippedTurret: "default",
-      caseHistory: [],
-      isGuest: true,
-    });
+    guestInventories.set(socketId, inventoryStorage.getInventory(inventoryId));
   }
   return guestInventories.get(socketId);
 }
@@ -3361,7 +3353,7 @@ app.get("/health", (req, res) => {
 app.get("/favicon.ico", (req, res) => res.redirect(302, "/favicon.svg"));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 io.use(async (socket, next) => {
-  const { accessToken, instanceId, guestName, customName, mode } = socket.handshake.auth || {};
+  const { accessToken, instanceId, guestName, customName, mode, guestId } = socket.handshake.auth || {};
   const requestedMode = mode === "horde" ? "horde" : "ffa";
   const validCustomName = (typeof customName === "string" && customName.trim().length > 0)
     ? customName.trim().slice(0, 20)
@@ -3372,7 +3364,7 @@ io.use(async (socket, next) => {
       ? guestName
       : `Guest${randomNum}`;
     socket.data.identity = {
-      id: "guest-" + validGuest,
+      id: typeof guestId === "string" && /^[a-f0-9-]{36}$/i.test(guestId) ? "guest-" + guestId : "guest-" + validGuest,
       name: validCustomName || validGuest,
       instanceId: instanceId || "browser-arena",
       isGuest: true,
@@ -3408,6 +3400,7 @@ io.use(async (socket, next) => {
     next(new Error("Could not verify Discord user"));
   }
 });
+const attachParty = require("./parties.cjs")(io);
 io.on("connection", (socket) => {
   const { id: discordId, name, instanceId, mode: initialMode } = socket.data.identity;
   const isGuest = Boolean(socket.data.identity?.isGuest);
@@ -3415,7 +3408,7 @@ io.on("connection", (socket) => {
   if (!isGuest) {
     playerInv = inventoryStorage.getInventory(discordId);
   } else {
-    playerInv = getGuestInventory(socket.id);
+    playerInv = getGuestInventory(socket.id, discordId);
   }
   let currentMode = initialMode === "horde" ? "horde" : "ffa";
   const hordeRoom = `activity:${instanceId}:horde`;
@@ -3572,9 +3565,9 @@ io.on("connection", (socket) => {
       maxHealth: maxHp,
     });
   });
-  socket.on("switch_mode", (targetMode) => {
+  function moveMode(targetMode, explicitRoom) {
     const validMode = targetMode === "horde" ? "horde" : "ffa";
-    const targetRoom = `activity:${instanceId}:${validMode}`;
+    const targetRoom = explicitRoom || (validMode === "horde" && party.room()) || `activity:${instanceId}:${validMode}`;
     if (p.mode === validMode && p.room === targetRoom && rooms.get(targetRoom)?.has(socket.id)) {
       if (validMode === "horde") {
         initHordeGame(targetRoom);
@@ -3628,7 +3621,9 @@ io.on("connection", (socket) => {
     p.deadSince = 0;
     p.protectedUntil = Date.now() + SPAWN_PROTECTION;
     socket.emit("mode_switched", { mode: validMode, character: p.character });
-  });
+  }
+  const party = attachParty(socket, p, moveMode);
+  socket.on("switch_mode", targetMode => { if (targetMode !== "horde") party.leave(); moveMode(targetMode); });
   socket.on("change_name", (rawName) => {
     if (typeof rawName !== "string") return;
     const cleanName = rawName.trim().slice(0, 20);
@@ -3839,6 +3834,7 @@ io.on("connection", (socket) => {
   });
   socket.on("active", (active) => {
     const nextActive = active === true;
+    if (nextActive && !party.canActivate()) return;
     if (nextActive && (!p.active || p.health <= 0)) {
       const nextSpawn = getPlayerSpawn(p.character, p.room);
       p.x = nextSpawn.x;
@@ -4120,82 +4116,24 @@ io.on("connection", (socket) => {
   });
 
   socket.on("open_turret_case", () => {
-    if (isGuest) {
-      const gInv = getGuestInventory(socket.id);
-      if (gInv.keys < 1) {
-        return socket.emit("case_opening_result", {
-          success: false,
-          error: "You have no keys remaining. Connect via Discord to receive permanent keys!",
-        });
-      }
-      gInv.keys -= 1;
-      const roll = crypto.randomInt(0, 10000);
-      let winningTurretId = "fire";
-      if (roll < 2950) winningTurretId = "fire";
-      else if (roll < 5900) winningTurretId = "ice";
-      else if (roll < 8850) winningTurretId = "double_barrel";
-      else if (roll < 9350) winningTurretId = "alien";
-      else if (roll < 9850) winningTurretId = "tripple_barrel";
-      else winningTurretId = "gold";
-
-      const isDup = gInv.unlockedTurrets.includes(winningTurretId);
-      let frags = 0;
-      if (isDup) {
-        frags = DUPLICATE_FRAGMENTS[TURRET_TYPES[winningTurretId].rarity] || 10;
-        gInv.fragments += frags;
-      } else {
-        gInv.unlockedTurrets.push(winningTurretId);
-      }
-      socket.emit("case_opening_result", {
-        success: true,
-        winningTurretId,
-        turret: TURRET_TYPES[winningTurretId],
-        isDuplicate: isDup,
-        fragmentsAwarded: frags,
-        inventory: gInv,
-      });
-      socket.emit("inventory_sync", {
-        inventory: gInv,
-        isAdmin: false,
-        isGuest: true,
-      });
-      return;
-    }
-
     const res = inventoryStorage.openTurretCase(discordId);
     socket.emit("case_opening_result", res);
     if (res.success) {
       socket.emit("inventory_sync", {
         inventory: res.inventory,
-        isAdmin: discordId === ADMIN_DISCORD_ID,
-        isGuest: false,
+        isAdmin: !isGuest && discordId === ADMIN_DISCORD_ID,
+        isGuest,
       });
     }
   });
 
   socket.on("craft_key", () => {
-    if (isGuest) {
-      const gInv = getGuestInventory(socket.id);
-      if (gInv.fragments < FRAGMENTS_PER_KEY) {
-        return socket.emit("craft_result", {
-          success: false,
-          error: `Need ${FRAGMENTS_PER_KEY} fragments (have ${gInv.fragments})`,
-        });
-      }
-      gInv.fragments -= FRAGMENTS_PER_KEY;
-      gInv.keys += 1;
-      return socket.emit("inventory_sync", {
-        inventory: gInv,
-        isAdmin: false,
-        isGuest: true,
-      });
-    }
     const res = inventoryStorage.craftKeyFromFragments(discordId);
     if (res.success) {
       socket.emit("inventory_sync", {
         inventory: res.inventory,
-        isAdmin: discordId === ADMIN_DISCORD_ID,
-        isGuest: false,
+        isAdmin: !isGuest && discordId === ADMIN_DISCORD_ID,
+        isGuest,
       });
     } else {
       socket.emit("craft_result", res);
@@ -4205,26 +4143,13 @@ io.on("connection", (socket) => {
   socket.on("equip_turret", (data) => {
     const turretId = typeof data === "string" ? data : data?.turretId;
     if (!turretId || !TURRET_TYPES[turretId]) return;
-    if (isGuest) {
-      const gInv = getGuestInventory(socket.id);
-      if (gInv.unlockedTurrets.includes(turretId)) {
-        gInv.equippedTurret = turretId;
-        p.equippedTurret = turretId;
-        socket.emit("inventory_sync", {
-          inventory: gInv,
-          isAdmin: false,
-          isGuest: true,
-        });
-      }
-      return;
-    }
     const res = inventoryStorage.equipTurret(discordId, turretId);
     if (res.success) {
       p.equippedTurret = turretId;
       socket.emit("inventory_sync", {
         inventory: res.inventory,
-        isAdmin: discordId === ADMIN_DISCORD_ID,
-        isGuest: false,
+        isAdmin: !isGuest && discordId === ADMIN_DISCORD_ID,
+        isGuest,
       });
     }
   });

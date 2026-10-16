@@ -14,7 +14,7 @@ const {
   ADMIN_DISCORD_ID,
 } = require("./turretConfig.cjs");
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.INVENTORY_DATA_DIR || path.join(__dirname, "data");
 const INVENTORIES_FILE = path.join(DATA_DIR, "inventories.json");
 const GIFTS_FILE = path.join(DATA_DIR, "gifts.json");
 
@@ -103,6 +103,7 @@ function sanitizeInventory(discordId, data = {}) {
     unlockedTurrets: validUnlocked,
     equippedTurret: equipped,
     caseHistory: Array.isArray(data.caseHistory) ? data.caseHistory.slice(-100) : [],
+    starterKeyGranted: data.starterKeyGranted === true,
     updatedAt: data.updatedAt || Date.now(),
   };
 }
@@ -120,9 +121,16 @@ function getInventory(discordId) {
   if (!inventories.has(idStr)) {
     const newInv = sanitizeInventory(idStr);
     inventories.set(idStr, newInv);
+  }
+  const inv = inventories.get(idStr);
+  if (!inv.starterKeyGranted) {
+    // Existing keys or case history count as an earlier starter grant.
+    if (inv.keys === 0 && inv.caseHistory.length === 0) inv.keys = 1;
+    inv.starterKeyGranted = true;
+    inv.updatedAt = Date.now();
     saveInventories();
   }
-  return inventories.get(idStr);
+  return inv;
 }
 
 /**

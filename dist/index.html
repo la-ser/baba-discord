@@ -4694,9 +4694,9 @@
         color: var(--text-muted);
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-vVprCBl7.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/CKWHMgEp.css">
-  </head>
+  <script type="module" crossorigin src="/assets/index-DEpoWY49.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/C_p3GlDU.css">
+</head>
   <body>
     <div id="game-shell">
       <div id="game-viewport">
@@ -5032,6 +5032,12 @@
       </div>
     </section>
 
+    <section id="party-screen" class="screen hidden" aria-label="Horde party lobby">
+      <div class="party-panel"><div class="badge-tag">HORDE / SQUAD OPERATIONS</div><h2>Your squad. Your last stand.</h2><p class="party-intro">Rally up to 8 operatives. Host a private lobby, share your code, or find a public squad.</p>
+      <div id="party-browser"><div class="party-actions"><button id="party-host" class="btn btn-primary">＋ Host a lobby</button><form id="party-join-form"><input id="party-code-input" maxlength="6" placeholder="LOBBY CODE" aria-label="Lobby code" required/><button class="btn">Join squad</button></form></div><div class="party-list-heading"><h3>Public lobbies</h3><button id="party-refresh" class="btn">Refresh</button></div><div id="party-public-list"></div></div>
+      <div id="party-room" class="hidden"><div class="party-code-bar"><div><small>INVITE CODE</small><strong id="party-code"></strong></div><button id="party-copy" class="btn">Copy code</button><span id="party-count"></span></div><label class="party-visibility"><input type="checkbox" id="party-public"/> Public lobby <small>Visible to all players</small></label><div id="party-members"></div><button id="party-start" class="btn btn-primary">Deploy squad</button><button id="party-leave" class="btn">Leave lobby</button></div>
+      <p id="party-message" role="status" aria-live="polite"></p><button id="party-back" class="btn">← Main menu</button></div>
+    </section>
     <!-- CHARACTER SELECTION MODAL -->
     <section id="character-screen" class="screen hidden">
       <div class="roster-container">
