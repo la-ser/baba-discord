@@ -634,7 +634,7 @@ class HordeGame {
           if (!p || !p.active || p.health <= 0) continue;
           const d = Math.hypot(p.x - ARENA_CENTER.x, p.y - ARENA_CENTER.y);
           if (d <= radius) {
-            const maxHp = getMaxHealth(p.character);
+            const maxHp = getPlayerMaxHealth(p);
             if (p.health < maxHp) {
               p.health = Math.min(maxHp, p.health + healAmt);
               io.to(p.id).emit("heal_received", {
@@ -752,11 +752,12 @@ class HordeGame {
         continue;
       }
 
-      // Check interaction with placed traps
+      // Check interaction with placed traps (Expanded cryo field)
       for (const obj of this.placedObjects) {
         if (obj.type === "trap" && obj.state === "ready") {
           const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
-          if (d <= obj.radius + enemy.radius) {
+          const triggerDist = (obj.radius || 60) + enemy.radius;
+          if (d <= triggerDist) {
             obj.state = "frozen";
             obj.frozenEnemyId = enemy.id;
             obj.frozenUntil = wallNow + 5000;
@@ -892,15 +893,101 @@ class HordeGame {
         }
       }
 
-      // Melee damage to nearby players (Manual Dodge only, never automatic)
+      // Player interaction: Deflect/Parry, Tactical Dodge damage, or Melee damage
+      let enemyKilledThisTick = false;
       for (const pid of roomPlayerIds) {
         const p = players.get(pid);
         if (!p || !p.active || p.health <= 0) continue;
         const pDist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
         const pRadius = characterRadius(p.character);
 
+        // 1. Deflect / Parry active -> Strike and knock back close enemies
+        const isParrying = p.parryUntil > wallNow || (p.shieldUntil && p.shieldUntil > wallNow);
+        if (isParrying && pDist <= enemy.radius + pRadius + 30) {
+          if (!enemy.lastParryHits) enemy.lastParryHits = new Map();
+          if (enemy.lastParryHits.get(p.id) !== p.parryId) {
+            enemy.lastParryHits.set(p.id, p.parryId);
+            const dmgMult = getPlayerDamageMultiplier(p);
+            const deflectDmg = Math.round((3.6 + (p.level || 1) * 0.22) * dmgMult * 10) / 10;
+            const pushX = (enemy.x - p.x) / (pDist || 1);
+            const pushY = (enemy.y - p.y) / (pDist || 1);
+            enemy.x += pushX * 36;
+            enemy.y += pushY * 36;
+            enemy.recoilVx += pushX * 260;
+            enemy.recoilVy += pushY * 260;
+            enemy.hp -= deflectDmg;
+            io.to(p.id).emit("hit_marker", { targetId: "enemy_" + enemy.id, headshot: false });
+            io.to(this.room).emit("enemy_hit", {
+              enemyId: enemy.id,
+              damage: deflectDmg,
+              hp: Math.max(0, enemy.hp),
+              maxHp: enemy.maxHp,
+              x: enemy.x,
+              y: enemy.y,
+            });
+            if (enemy.hp <= 0) {
+              p.score.kills = (p.score.kills || 0) + 1;
+              awardXp(p, enemy.xp);
+              io.to(this.room).emit("enemy_killed", {
+                enemyId: enemy.id,
+                type: enemy.type,
+                x: enemy.x,
+                y: enemy.y,
+                killerId: p.id,
+              });
+              this.enemies.splice(ei, 1);
+              enemyKilledThisTick = true;
+              break;
+            }
+          }
+          continue; // Enemy blocked by deflect; cannot deal damage to player
+        }
+
+        // 2. Tactical Dodge active -> Strike and stagger close enemies
+        const isDodging = wallNow < (p.dodgeUntil || 0);
+        if (isDodging && pDist <= enemy.radius + pRadius + 24) {
+          if (!enemy.lastDodgeHits) enemy.lastDodgeHits = new Map();
+          if (enemy.lastDodgeHits.get(p.id) !== p.dodgeId) {
+            enemy.lastDodgeHits.set(p.id, p.dodgeId);
+            const dmgMult = getPlayerDamageMultiplier(p);
+            const dodgeDmg = Math.round((2.5 + (p.level || 1) * 0.16) * dmgMult * 10) / 10;
+            const dX = p.dodgeDirection?.x || ((enemy.x - p.x) / (pDist || 1));
+            const dY = p.dodgeDirection?.y || ((enemy.y - p.y) / (pDist || 1));
+            enemy.x += dX * 24;
+            enemy.y += dY * 24;
+            enemy.recoilVx += dX * 200;
+            enemy.recoilVy += dY * 200;
+            enemy.hp -= dodgeDmg;
+            io.to(p.id).emit("hit_marker", { targetId: "enemy_" + enemy.id, headshot: false });
+            io.to(this.room).emit("enemy_hit", {
+              enemyId: enemy.id,
+              damage: dodgeDmg,
+              hp: Math.max(0, enemy.hp),
+              maxHp: enemy.maxHp,
+              x: enemy.x,
+              y: enemy.y,
+            });
+            if (enemy.hp <= 0) {
+              p.score.kills = (p.score.kills || 0) + 1;
+              awardXp(p, enemy.xp);
+              io.to(this.room).emit("enemy_killed", {
+                enemyId: enemy.id,
+                type: enemy.type,
+                x: enemy.x,
+                y: enemy.y,
+                killerId: p.id,
+              });
+              this.enemies.splice(ei, 1);
+              enemyKilledThisTick = true;
+              break;
+            }
+          }
+          continue; // Enemy avoided during tactical dodge roll; cannot deal damage to player
+        }
+
         if (p.protectedUntil > wallNow) continue;
 
+        // 3. Melee damage to player
         if (pDist <= enemy.radius + pRadius + 2) {
           if (wallNow - enemy.lastPlayerAttackAt >= enemy.attackCooldown) {
             enemy.lastPlayerAttackAt = wallNow;
@@ -921,6 +1008,7 @@ class HordeGame {
           }
         }
       }
+      if (enemyKilledThisTick) continue;
     }
 
     // 7. Wave Cleared -> Trigger Upgrade Selection (Game Pauses!)
@@ -932,7 +1020,7 @@ class HordeGame {
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
           if (p && p.active) {
-            p.health = Math.min(getMaxHealth(p.character), p.health + 10);
+            p.health = Math.min(getPlayerMaxHealth(p), p.health + 10);
             awardXp(p, 50 + this.wave * 15);
           }
         }
@@ -1025,9 +1113,31 @@ function initHordeGame(room) {
   return h;
 }
 
-function getMaxHealth(character) {
-  return CHARACTER_STATS[character]?.maxHealth || MAX_HEALTH;
+function getMaxHealth(character, level = 1, isHorde = false) {
+  const base = CHARACTER_STATS[character]?.maxHealth || MAX_HEALTH;
+  if (isHorde) {
+    // Balanced health scaling up to level 100 (+0.8 max HP per level, reaching ~100 max HP at level 100)
+    return Math.round((base + (Math.max(1, level) - 1) * 0.8) * 10) / 10;
+  }
+  return base;
 }
+
+function getPlayerDamageMultiplier(player) {
+  if (!player) return 1.0;
+  const isHorde = player.mode === "horde" || (player.room && player.room.endsWith(":horde"));
+  if (isHorde) {
+    // Operative weapon & ability damage scales +2.5% per level above 1 to keep pace with higher waves
+    return 1 + (Math.max(1, player.level || 1) - 1) * 0.025;
+  }
+  return 1.0;
+}
+
+function getPlayerMaxHealth(player) {
+  if (!player) return MAX_HEALTH;
+  const isHorde = player.mode === "horde" || (player.room && player.room.endsWith(":horde"));
+  return getMaxHealth(player.character, player.level || 1, isHorde);
+}
+
 
 function clampToArena(x, y, radius = 0) {
   const dx = x - ARENA_CENTER.x;
@@ -1141,22 +1251,25 @@ function respawnObject(room, type) {
   list.push(createRandomObject(room, type));
 }
 
-function getLevelForXp(xp) {
-  if (xp >= 1000) return 10;
-  if (xp >= 800) return 9;
-  if (xp >= 600) return 8;
-  if (xp >= 450) return 7;
-  if (xp >= 320) return 6;
-  if (xp >= 220) return 5;
-  if (xp >= 140) return 4;
-  if (xp >= 75) return 3;
-  if (xp >= 30) return 2;
+const LEVEL_XP_THRESHOLDS = [0, 30, 75, 140, 220, 320, 450, 600, 800, 1000];
+for (let lvl = 11; lvl <= 100; lvl++) {
+  const prev = LEVEL_XP_THRESHOLDS[lvl - 1];
+  const delta = 220 + (lvl - 10) * 28;
+  LEVEL_XP_THRESHOLDS.push(prev + delta);
+}
+
+function getLevelForXp(xp, isHorde = false) {
+  const maxLvl = isHorde ? 100 : 10;
+  for (let lvl = maxLvl; lvl >= 1; lvl--) {
+    if (xp >= LEVEL_XP_THRESHOLDS[lvl - 1]) return lvl;
+  }
   return 1;
 }
 
-function getXpForNextLevel(level) {
-  const thresholds = [0, 30, 75, 140, 220, 320, 450, 600, 800, 1000];
-  return thresholds[level] || 1000;
+function getXpForNextLevel(level, isHorde = false) {
+  const maxLvl = isHorde ? 100 : 10;
+  if (level >= maxLvl) return LEVEL_XP_THRESHOLDS[maxLvl - 1];
+  return LEVEL_XP_THRESHOLDS[level] || LEVEL_XP_THRESHOLDS[maxLvl - 1];
 }
 
 const CHARACTER_MASKS = Object.fromEntries(
@@ -1324,7 +1437,7 @@ function killPlayer(victim, killerId = null, attackerCharacter = "environment") 
     const nextSpawn = getPlayerSpawn(victim.character, victim.room);
     victim.x = nextSpawn.x;
     victim.y = nextSpawn.y;
-    victim.health = getMaxHealth(victim.character);
+    victim.health = getPlayerMaxHealth(victim);
     victim.deadSince = 0;
     victim.soundwaveActive = false;
     victim.shieldUntil = 0;
@@ -1628,7 +1741,7 @@ io.on("connection", (socket) => {
       if (character === "granny" || character === "cyborg" || character === "mama_cyborg" || character === "angry_granny") {
         p.character = character;
         p.lastFfaCharacter = character;
-        p.health = getMaxHealth(character);
+        p.health = getPlayerMaxHealth(p);
         const radius = characterRadius(character);
         p.x = clamp(p.x, radius, WIDTH - radius);
         p.y = clamp(p.y, radius, HEIGHT - radius);
@@ -1647,7 +1760,7 @@ io.on("connection", (socket) => {
     if (p.mode !== "horde") {
       p.lastFfaCharacter = character;
     }
-    const maxHp = getMaxHealth(character);
+    const maxHp = getPlayerMaxHealth(p);
     p.health = maxHp;
     p.soundwaveActive = false;
     const radius = characterRadius(character);
@@ -1683,7 +1796,7 @@ io.on("connection", (socket) => {
 
     if (validMode === "horde") {
       p.character = "scientist";
-      p.health = 20;
+      p.health = getPlayerMaxHealth(p);
       p.hasDash = false;
       p.hasDodge = false;
       p.pendingPlacements = [];
@@ -1693,7 +1806,7 @@ io.on("connection", (socket) => {
       initHordeGame(newRoom);
     } else {
       p.character = p.lastFfaCharacter || "granny";
-      p.health = getMaxHealth(p.character);
+      p.health = getPlayerMaxHealth(p);
       p.hasDash = true;
       p.hasDodge = false;
       p.pendingPlacements = [];
@@ -1757,7 +1870,7 @@ io.on("connection", (socket) => {
       ownerId: p.id,
       x: Math.round(x),
       y: Math.round(y),
-      radius: type === "wall" ? 30 : (type === "turret" ? 22 : 25),
+      radius: type === "wall" ? 30 : (type === "turret" ? 22 : 60),
       hp: type === "wall" ? 60 : (type === "turret" ? 28 : 100),
       maxHp: type === "wall" ? 60 : (type === "turret" ? 28 : 100),
       angle: Number.isFinite(angle) ? angle : 0,
@@ -1833,7 +1946,7 @@ io.on("connection", (socket) => {
       const nextSpawn = getPlayerSpawn(p.character, p.room);
       p.x = nextSpawn.x;
       p.y = nextSpawn.y;
-      p.health = getMaxHealth(p.character);
+      p.health = getPlayerMaxHealth(p);
       p.soundwaveActive = false;
       p.deadSince = 0;
       p.shieldUntil = 0;
@@ -1882,7 +1995,7 @@ io.on("connection", (socket) => {
       const nextSpawn = getPlayerSpawn(p.character, p.room);
       p.x = nextSpawn.x;
       p.y = nextSpawn.y;
-      p.health = getMaxHealth(p.character);
+      p.health = getPlayerMaxHealth(p);
       p.deadSince = 0;
       p.soundwaveActive = false;
       p.shieldUntil = 0;
@@ -2082,7 +2195,7 @@ io.on("connection", (socket) => {
       vx: direction.x * bSpeed,
       vy: direction.y * bSpeed,
       radius: bRadius,
-      damage: stats.damage,
+      damage: Math.round(stats.damage * getPlayerDamageMultiplier(p) * 100) / 100,
       character: p.character,
       homing: p.character === "sigmatom",
       canSplit: canSplit,
@@ -2120,26 +2233,30 @@ function awardXp(player, amount) {
   if (!player) return;
   player.xp = (player.xp || 0) + amount;
   const oldLevel = player.level || 1;
-  const newLevel = getLevelForXp(player.xp);
+  const isHorde = player.mode === "horde" || (player.room && player.room.endsWith(":horde"));
+  const newLevel = getLevelForXp(player.xp, isHorde);
   player.level = newLevel;
 
   io.to(player.id).emit("xp_update", {
     xp: player.xp,
     level: player.level,
     gained: amount,
-    nextLevelXp: getXpForNextLevel(player.level),
+    nextLevelXp: getXpForNextLevel(player.level, isHorde),
   });
 
   if (newLevel > oldLevel) {
-    const maxHp = getMaxHealth(player.character);
-    player.health = maxHp;
+    const oldMaxHp = getMaxHealth(player.character, oldLevel, isHorde);
+    const newMaxHp = getMaxHealth(player.character, newLevel, isHorde);
+    const hpGain = Math.max(0, newMaxHp - oldMaxHp);
+    player.health = Math.min(newMaxHp, (player.health || oldMaxHp) + hpGain);
+
     io.to(player.room).emit("player_leveled_up", {
       playerId: player.id,
       name: player.name,
       level: newLevel,
       health: player.health,
-      maxHealth: maxHp,
-      unlockedMamaCyborg: newLevel >= 10,
+      maxHealth: newMaxHp,
+      unlockedMamaCyborg: !isHorde && newLevel === 10,
     });
   }
 }
@@ -2231,7 +2348,7 @@ setInterval(() => {
         const nextSpawn = getPlayerSpawn(p.character, p.room);
         p.x = nextSpawn.x;
         p.y = nextSpawn.y;
-        p.health = getMaxHealth(p.character);
+        p.health = getPlayerMaxHealth(p);
         p.deadSince = 0;
         p.soundwaveActive = false;
         p.shieldUntil = 0;
@@ -2250,7 +2367,7 @@ setInterval(() => {
   // Health Regeneration: All players regenerate health over time!
   for (const p of players.values()) {
     if (!p.active || p.health <= 0) continue;
-    const maxHp = getMaxHealth(p.character);
+    const maxHp = getPlayerMaxHealth(p);
     if (p.health < maxHp) {
       const timeSinceDamage = wallNow - (p.lastDamageAt || 0);
       // Continuous regen: 2.5% max HP / sec. Out-of-combat boost after 3.5s without damage: 8% max HP / sec
@@ -2961,7 +3078,7 @@ setInterval(() => {
         dodgeDirection: p.dodgeDirection,
         lastInputSeq: p.lastInputSeq,
         health: Math.round(p.health * 10) / 10,
-        maxHealth: getMaxHealth(p.character),
+        maxHealth: getPlayerMaxHealth(p),
         kills: p.score.kills,
         deaths: p.score.deaths,
         minigun: p.minigun,
