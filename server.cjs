@@ -59,7 +59,7 @@ const ENEMY_CONFIG = {
     radius: 38,
     speed: 215,
     damage: 1.5,
-    maxHp: 6,
+    maxHp: 5,
     xp: 25,
     hasDodge: true,
     dodgeCooldown: 4000,
@@ -74,7 +74,7 @@ const ENEMY_CONFIG = {
     radius: 43,
     speed: 155,
     damage: 2.0,
-    maxHp: 12,
+    maxHp: 8,
     xp: 30,
     hasDodge: false,
   },
@@ -86,8 +86,8 @@ const ENEMY_CONFIG = {
     height: 127,
     radius: 50,
     speed: 130,
-    damage: 3.5,
-    maxHp: 20,
+    damage: 3.2,
+    maxHp: 16,
     xp: 45,
     hasDodge: false,
   },
@@ -100,7 +100,7 @@ const ENEMY_CONFIG = {
     radius: 41,
     speed: 190,
     damage: 2.2,
-    maxHp: 10,
+    maxHp: 7,
     xp: 35,
     hasDodge: false,
   },
@@ -113,7 +113,7 @@ const ENEMY_CONFIG = {
     radius: 38,
     speed: 235,
     damage: 2.1,
-    maxHp: 8,
+    maxHp: 6,
     xp: 40,
     hasDodge: true,
     dodgeCooldown: 3500,
@@ -127,8 +127,8 @@ const ENEMY_CONFIG = {
     height: 115,
     radius: 42,
     speed: 175,
-    damage: 3.0,
-    maxHp: 15,
+    damage: 2.8,
+    maxHp: 11,
     xp: 35,
     hasDodge: false,
   },
@@ -140,8 +140,8 @@ const ENEMY_CONFIG = {
     height: 125,
     radius: 41,
     speed: 165,
-    damage: 2.6,
-    maxHp: 14,
+    damage: 2.5,
+    maxHp: 10,
     xp: 35,
     hasDodge: false,
   },
@@ -153,8 +153,8 @@ const ENEMY_CONFIG = {
     height: 142,
     radius: 55,
     speed: 105,
-    damage: 5.0,
-    maxHp: 32,
+    damage: 4.5,
+    maxHp: 22,
     xp: 70,
     hasDodge: false,
   },
@@ -166,8 +166,8 @@ const ENEMY_CONFIG = {
     height: 115,
     radius: 46,
     speed: 140,
-    damage: 2.8,
-    maxHp: 18,
+    damage: 2.6,
+    maxHp: 13,
     xp: 40,
     hasDodge: false,
   },
@@ -179,8 +179,8 @@ const ENEMY_CONFIG = {
     height: 104,
     radius: 41,
     speed: 205,
-    damage: 2.4,
-    maxHp: 11,
+    damage: 2.3,
+    maxHp: 8,
     xp: 45,
     hasDodge: true,
     dodgeCooldown: 4500,
@@ -240,6 +240,32 @@ const HORDE_CARDS = {
     condition: (player, horde) => (player.zoomLevel || 0) < 2,
     apply: (player, horde) => {
       player.zoomLevel = Math.min(2, (player.zoomLevel || 0) + 1);
+    }
+  },
+  weapon_damage: {
+    id: "weapon_damage",
+    category: "upgrade",
+    rarity: "common",
+    name: "Plasma Overcharge",
+    desc: "Overcharge blaster coils: increase kinetic and plasma bullet damage by +20% (stackable).",
+    icon: "⚡",
+    faIcon: "fa-solid fa-bolt",
+    condition: () => true,
+    apply: (player) => {
+      player.bonusDamageMult = (player.bonusDamageMult || 0) + 0.20;
+    }
+  },
+  weapon_rapid_fire: {
+    id: "weapon_rapid_fire",
+    category: "upgrade",
+    rarity: "uncommon",
+    name: "Hair Trigger",
+    desc: "Upgrade cycling mechanism: accelerates weapon firing rate by 15% (stackable).",
+    icon: "🔫",
+    faIcon: "fa-solid fa-gun",
+    condition: () => true,
+    apply: (player) => {
+      player.fireRateMult = (player.fireRateMult || 1.0) * 0.85;
     }
   },
 
@@ -490,11 +516,11 @@ class HordeGame {
       speed = Math.min(125, config.speed * 0.76);
       damage = 1.4;
     } else if (this.wave === 3) {
-      hp = Math.max(2, Math.round(config.maxHp * 0.35));
+      hp = Math.max(2, Math.round(config.maxHp * 0.45));
       speed = config.speed * 0.88;
       damage = Math.max(1.5, config.damage * 0.75);
     } else {
-      const waveProgress = Math.min(2.0, 0.4 + (this.wave - 3) * 0.15);
+      const waveProgress = Math.min(1.80, 0.45 + (this.wave - 3) * 0.09);
       hp = Math.max(3, Math.round(config.maxHp * waveProgress));
       speed = config.speed;
       damage = config.damage;
@@ -538,8 +564,8 @@ class HordeGame {
     const spawnSide = Math.random() < 0.5 ? "left" : "right";
     const spawnX = spawnSide === "left" ? ARENA_CENTER.x - 1100 : ARENA_CENTER.x + 1100;
     const spawnY = ARENA_CENTER.y;
-    // Health balanced for wave 10: base 350 + 175 per extra player
-    const maxHp = 350 + (activeCount - 1) * 175;
+    // Health balanced for wave 10: base 280 + 140 per extra player
+    const maxHp = 280 + (activeCount - 1) * 140;
 
     this.boss = {
       id: "boss_tung",
@@ -710,7 +736,7 @@ class HordeGame {
       this.boss.spirals = [];
 
       const spiralDist = 240;
-      const sHp = 45 + Math.max(0, activePlayers.length - 1) * 20;
+      const sHp = 24 + Math.max(0, activePlayers.length - 1) * 12;
       for (let si = 0; si < 4; si++) {
         const sAngle = si * (Math.PI / 2);
         this.boss.spirals.push({
@@ -1002,6 +1028,8 @@ class HordeGame {
       hasDash: player.hasDash === true,
       hasDodge: player.hasDodge === true,
       zoomLevel: player.zoomLevel || 0,
+      fireRateMult: player.fireRateMult || 1.0,
+      bonusDamageMult: player.bonusDamageMult || 0,
     };
     const targetSocket = io.sockets.sockets.get(player.id);
     if (targetSocket) {
@@ -1719,6 +1747,8 @@ class HordeGame {
             p.hasDodge = false;
             p.stunnedUntil = 0;
             p.zoomLevel = 0;
+            p.bonusDamageMult = 0;
+            p.fireRateMult = 1.0;
             p.pendingPlacements = [];
             p.deadSince = 0;
             p.protectedUntil = wallNow + SPAWN_PROTECTION;
@@ -1766,12 +1796,30 @@ function getMaxHealth(character, level = 1, isHorde = false) {
   return base;
 }
 
+function getPlayerBaseDamage(player) {
+  const stats = CHARACTER_STATS[player?.character] || CHARACTER_STATS.granny;
+  const isHorde = player?.mode === "horde" || (player?.room && player?.room.endsWith(":horde"));
+  if (!isHorde) return stats.damage;
+
+  // In Horde Mode, provide solid baseline firepower so default operatives aren't pea-shooters:
+  // Granny / Scientist: 2.5 base damage (was 1.0)
+  // Cyborg: 3.2 base damage (was 2.25)
+  // Mama Cyborg / Angry Granny: 3.0 base damage (was 2.0)
+  // Sigmatom: 5.0 base damage (was 4.5)
+  if (stats.damage <= 1.0) return 2.5;
+  if (stats.damage <= 2.0) return 3.0;
+  if (stats.damage <= 2.5) return 3.2;
+  return Math.max(3.5, stats.damage);
+}
+
 function getPlayerDamageMultiplier(player) {
   if (!player) return 1.0;
   const isHorde = player.mode === "horde" || (player.room && player.room.endsWith(":horde"));
   if (isHorde) {
-    // Operative weapon & ability damage scales +2.5% per level above 1 to keep pace with higher waves
-    return 1 + (Math.max(1, player.level || 1) - 1) * 0.025;
+    // Operative weapon & ability damage scales +5.5% per level above 1 plus card bonuses
+    const levelBonus = (Math.max(1, player.level || 1) - 1) * 0.055;
+    const cardBonus = player.bonusDamageMult || 0;
+    return 1 + levelBonus + cardBonus;
   }
   return 1.0;
 }
@@ -1895,11 +1943,14 @@ function respawnObject(room, type) {
   list.push(createRandomObject(room, type));
 }
 
-const LEVEL_XP_THRESHOLDS = [0, 30, 75, 140, 220, 320, 450, 600, 800, 1000];
-for (let lvl = 11; lvl <= 100; lvl++) {
-  const prev = LEVEL_XP_THRESHOLDS[LEVEL_XP_THRESHOLDS.length - 1];
-  const delta = 200 + (lvl - 10) * 12;
-  LEVEL_XP_THRESHOLDS.push(prev + delta);
+const LEVEL_XP_THRESHOLDS = [0];
+let runningXpThreshold = 0;
+for (let lvl = 2; lvl <= 100; lvl++) {
+  // Balanced progression: early levels feel earned (Level 2 takes 120 XP, ~wave 1 end),
+  // reaching ~Level 12 by Wave 10, and scaling steadily up to ~200k total XP at Level 100.
+  const delta = 120 + (lvl - 2) * 40;
+  runningXpThreshold += delta;
+  LEVEL_XP_THRESHOLDS.push(runningXpThreshold);
 }
 
 function getLevelForXp(xp, isHorde = false) {
@@ -2814,12 +2865,14 @@ io.on("connection", (socket) => {
   });
   socket.on("shoot", (target) => {
     const now = Date.now();
+    const baseShotCooldown = (p.character === "sigmatom" || p.minigun) ? MINIGUN_COOLDOWN : SHOT_COOLDOWN;
+    const effectiveShotCooldown = Math.max(100, Math.round(baseShotCooldown * (p.fireRateMult || 1.0)));
     if (
       !p.active ||
       p.health <= 0 ||
       now < (p.stunnedUntil || 0) ||
       now < p.parryUntil ||
-      now - p.lastShotAt < ((p.character === "sigmatom" || p.minigun) ? MINIGUN_COOLDOWN : SHOT_COOLDOWN) ||
+      now - p.lastShotAt < effectiveShotCooldown ||
       !target ||
       !Number.isFinite(target.x) ||
       !Number.isFinite(target.y)
@@ -2880,7 +2933,7 @@ io.on("connection", (socket) => {
       vx: direction.x * bSpeed,
       vy: direction.y * bSpeed,
       radius: bRadius,
-      damage: Math.round(stats.damage * getPlayerDamageMultiplier(p) * 100) / 100,
+      damage: Math.round(getPlayerBaseDamage(p) * getPlayerDamageMultiplier(p) * 100) / 100,
       character: p.character,
       homing: p.character === "sigmatom",
       canSplit: canSplit,
