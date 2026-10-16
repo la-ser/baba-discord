@@ -494,10 +494,23 @@ class HordeGame {
   generateCardOptions(player) {
     const available = [];
     for (const card of Object.values(HORDE_CARDS)) {
-      if (card.condition(player, this)) {
-        available.push(card);
+      try {
+        if (card && typeof card.condition === "function" && card.condition(player, this)) {
+          available.push(card);
+        }
+      } catch (e) {
+        // Safe skip on condition evaluation error
       }
     }
+    // Guarantee fallback cards if pool is too small
+    if (available.length < 3) {
+      if (!available.some(c => c.id === "granny_turret")) available.push(HORDE_CARDS.granny_turret);
+      if (!available.some(c => c.id === "granny_heal_aura")) available.push(HORDE_CARDS.granny_heal_aura);
+      if (!available.some(c => c.id === "object_wall")) available.push(HORDE_CARDS.object_wall);
+      if (!available.some(c => c.id === "object_turret")) available.push(HORDE_CARDS.object_turret);
+      if (!available.some(c => c.id === "object_trap")) available.push(HORDE_CARDS.object_trap);
+    }
+
     const pool = [];
     for (const card of available) {
       let weight = 10;
@@ -534,16 +547,24 @@ class HordeGame {
     if (!card) return;
     card.apply(player, this);
 
-    io.to(player.id).emit("upgrade_applied", {
+    const upgradePayload = {
       cardId: card.id,
       name: card.name,
       category: card.category,
       hasDash: player.hasDash === true,
       hasDodge: player.hasDodge === true,
-    });
+    };
+    const targetSocket = io.sockets.sockets.get(player.id);
+    if (targetSocket) {
+      targetSocket.emit("upgrade_applied", upgradePayload);
+    }
+    io.to(player.id).emit("upgrade_applied", upgradePayload);
 
     if (card.category === "object") {
       const objectType = card.id.replace("object_", "");
+      if (targetSocket) {
+        targetSocket.emit("enter_placement_mode", { objectType });
+      }
       io.to(player.id).emit("enter_placement_mode", { objectType });
     }
   }
@@ -1019,8 +1040,10 @@ class HordeGame {
 
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
-          if (p && p.active) {
-            p.health = Math.min(getPlayerMaxHealth(p), p.health + 10);
+          if (p) {
+            p.active = true;
+            p.deadSince = 0;
+            p.health = Math.min(getPlayerMaxHealth(p), Math.max(p.health, 10) + 10);
             awardXp(p, 50 + this.wave * 15);
           }
         }
@@ -1030,22 +1053,33 @@ class HordeGame {
 
         for (const pid of roomPlayerIds) {
           const p = players.get(pid);
-          if (p && p.active) {
+          if (p) {
             this.pendingPlayersToChoose.add(pid);
             const cards = this.generateCardOptions(p);
             this.cardOfferings.set(pid, cards);
-            io.to(pid).emit("horde_upgrade_options", {
+            const payload = {
               wave: this.wave,
               options: cards,
               baseHealth: Math.round(this.baseHealth * 10) / 10,
-            });
+            };
+            const sock = io.sockets.sockets.get(pid);
+            if (sock) {
+              sock.emit("horde_upgrade_options", payload);
+            }
+            io.to(pid).emit("horde_upgrade_options", payload);
           }
+        }
+
+        const offeringsObj = {};
+        for (const [pid, cards] of this.cardOfferings.entries()) {
+          offeringsObj[pid] = cards;
         }
 
         io.to(this.room).emit("wave_cleared", {
           wave: this.wave,
           baseHealth: Math.round(this.baseHealth * 10) / 10,
           isUpgrading: true,
+          offerings: offeringsObj,
         });
 
         clearTimeout(this.upgradeTimeout);
@@ -1841,10 +1875,29 @@ io.on("connection", (socket) => {
     horde.applyCardUpgrade(p, cardId, io);
     horde.pendingPlayersToChoose.delete(socket.id);
 
-    if (horde.pendingPlayersToChoose.size === 0) {
+    const roomPids = rooms.get(horde.room) || new Set();
+    const stillWaiting = [...horde.pendingPlayersToChoose].some(id => roomPids.has(id) && io.sockets.sockets.has(id));
+    if (!stillWaiting || horde.pendingPlayersToChoose.size === 0) {
       clearTimeout(horde.upgradeTimeout);
-      horde.startNextWave(io, rooms.get(horde.room) || new Set());
+      horde.startNextWave(io, roomPids);
     }
+  });
+  socket.on("request_horde_upgrades", () => {
+    if (p.mode !== "horde") return;
+    const horde = hordeGames.get(p.room);
+    if (!horde || horde.waveState !== "upgrade_selection") return;
+    let cards = horde.cardOfferings.get(socket.id);
+    if (!cards || cards.length === 0) {
+      horde.pendingPlayersToChoose.add(socket.id);
+      cards = horde.generateCardOptions(p);
+      horde.cardOfferings.set(socket.id, cards);
+    }
+    const payload = {
+      wave: horde.wave,
+      options: cards,
+      baseHealth: Math.round(horde.baseHealth * 10) / 10,
+    };
+    socket.emit("horde_upgrade_options", payload);
   });
   socket.on("place_horde_object", (payload) => {
     if (p.mode !== "horde") return;
@@ -1963,16 +2016,17 @@ io.on("connection", (socket) => {
     if (p.mode === "horde" && p.active) {
       const horde = initHordeGame(p.room);
       if (horde && horde.waveState === "upgrade_selection") {
-        if (!horde.cardOfferings.has(socket.id)) {
+        let cards = horde.cardOfferings.get(socket.id);
+        if (!cards || cards.length === 0) {
           horde.pendingPlayersToChoose.add(socket.id);
-          const cards = horde.generateCardOptions(p);
+          cards = horde.generateCardOptions(p);
           horde.cardOfferings.set(socket.id, cards);
-          socket.emit("horde_upgrade_options", {
-            wave: horde.wave,
-            options: cards,
-            baseHealth: Math.round(horde.baseHealth * 10) / 10,
-          });
         }
+        socket.emit("horde_upgrade_options", {
+          wave: horde.wave,
+          options: cards,
+          baseHealth: Math.round(horde.baseHealth * 10) / 10,
+        });
       }
     }
     if (!p.active) {

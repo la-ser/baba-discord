@@ -899,6 +899,10 @@
         letter-spacing: 0.12em;
         white-space: nowrap;
       }
+      body.horde-mode .minimap-title,
+      .horde-mode .minimap-title {
+        display: none !important;
+      }
       .radar-tag {
         display: flex;
         align-items: center;
@@ -2409,12 +2413,12 @@
       .horde-upgrade-modal {
         position: fixed;
         inset: 0;
-        z-index: 100;
+        z-index: 1500;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        padding: 24px;
+        justify-content: flex-start;
+        padding: clamp(16px, 4vh, 40px) 16px;
         overflow-y: auto;
         perspective: 1400px;
         pointer-events: auto;
@@ -2832,12 +2836,10 @@
         transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
       }
       .rpg-card.is-arming {
-        cursor: wait !important;
-        pointer-events: none;
+        cursor: pointer;
       }
       .rpg-card.is-arming .rpg-select-btn {
-        opacity: 0.55;
-        cursor: wait !important;
+        opacity: 0.85;
       }
 
       /* Tactical Arsenal / Current Abilities Drawer Modal */
@@ -3059,7 +3061,7 @@
         color: #fff;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-uxgZ_FPa.js"></script>
+    <script type="module" crossorigin src="/assets/index-IL9-GM24.js"></script>
   </head>
   <body>
     <div id="game-shell">
