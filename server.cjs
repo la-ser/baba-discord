@@ -661,6 +661,7 @@ class HordeGame {
           const d = Math.hypot(p.x - this.boss.x, p.y - this.boss.y);
           if (d <= 85) {
             p.health = Math.max(0, p.health - 4.5);
+            p.lastDamageAt = wallNow;
             io.to(p.id).emit("damage_taken", { health: p.health, damage: 4.5, source: "boss_stomp" });
           }
         }
@@ -845,6 +846,7 @@ class HordeGame {
             if (d <= 65) {
               const dmg = 3.5;
               p.health = Math.max(0, p.health - dmg);
+              p.lastDamageAt = wallNow;
               io.to(p.id).emit("damage_taken", { health: p.health, damage: dmg, source: "tung_bomb" });
             }
           }
@@ -3071,9 +3073,23 @@ setInterval(() => {
     if (!p.active || p.health <= 0) continue;
     const maxHp = getPlayerMaxHealth(p);
     if (p.health < maxHp) {
+      const isHorde = p.mode === "horde" || (p.room && p.room.endsWith(":horde"));
       const timeSinceDamage = wallNow - (p.lastDamageAt || 0);
-      // Continuous regen: 2.5% max HP / sec. Out-of-combat boost after 3.5s without damage: 8% max HP / sec
-      const regenRate = timeSinceDamage > 3500 ? (maxHp * 0.08) : (maxHp * 0.025);
+      const timeSinceShot = wallNow - (p.lastShotAt || 0);
+
+      // Regeneration is paused for a few seconds while shooting or getting hit
+      const damageCooldown = isHorde ? 4500 : 3500;
+      const shootCooldown = isHorde ? 3000 : 2000;
+
+      if (timeSinceDamage < damageCooldown || timeSinceShot < shootCooldown) {
+        continue;
+      }
+
+      // Greatly reduced default passive regeneration in Horde mode without Granny's healing aura:
+      // In Horde mode: 0.8% max HP / sec (takes ~125s from 0 to full).
+      // Granny's healing aura provides 2-4 HP per pulse every 1.5-2.5s, making the aura crucial.
+      // In FFA mode: 4.5% max HP / sec out of combat.
+      const regenRate = isHorde ? (maxHp * 0.008) : (maxHp * 0.045);
       p.health = Math.min(maxHp, p.health + regenRate * dt);
     }
   }
