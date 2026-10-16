@@ -147,16 +147,45 @@ const ENEMY_CONFIG = {
   },
   cyborgian_9: {
     type: "cyborgian_9",
-    name: "Goliath",
+    name: "Goliath Splitter",
     texture: "cyborgian (9).png",
-    width: 89,
-    height: 142,
-    radius: 55,
-    speed: 105,
+    width: 134,
+    height: 213,
+    radius: 82,
+    speed: 95,
     damage: 4.5,
-    maxHp: 22,
+    maxHp: 26,
     xp: 70,
     hasDodge: false,
+    isSplitter: true,
+  },
+  cyborgian_split_1: {
+    type: "cyborgian_split_1",
+    name: "Split Cyber-Alpha",
+    texture: "split_1.png",
+    width: 52,
+    height: 68,
+    radius: 26,
+    speed: 240,
+    damage: 1.8,
+    maxHp: 1,
+    xp: 20,
+    hasDodge: false,
+    isSplitChild: true,
+  },
+  cyborgian_split_2: {
+    type: "cyborgian_split_2",
+    name: "Split Cyber-Beta",
+    texture: "split_2.png",
+    width: 52,
+    height: 68,
+    radius: 26,
+    speed: 240,
+    damage: 1.8,
+    maxHp: 1,
+    xp: 20,
+    hasDodge: false,
+    isSplitChild: true,
   },
   cyborgian_10: {
     type: "cyborgian_10",
@@ -565,9 +594,9 @@ class HordeGame {
   getAvailableTypesForWave(wave) {
     if (wave === 1) return ["cyborgian_1", "cyborgian_2", "cyborgian_4"];
     if (wave === 2) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_6"];
-    if (wave === 3) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_5", "cyborgian_6", "cyborgian_8"];
-    if (wave === 4) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_5", "cyborgian_6", "cyborgian_8", "cyborgian_10", "cyborgian_11"];
-    return Object.keys(ENEMY_CONFIG);
+    if (wave === 3) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_5", "cyborgian_6", "cyborgian_8", "cyborgian_9"];
+    if (wave === 4) return ["cyborgian_1", "cyborgian_2", "cyborgian_3", "cyborgian_4", "cyborgian_5", "cyborgian_6", "cyborgian_8", "cyborgian_9", "cyborgian_10", "cyborgian_11"];
+    return Object.keys(ENEMY_CONFIG).filter((k) => !ENEMY_CONFIG[k].isSplitChild);
   }
 
   spawnEnemy(activePlayerCount = 1) {
@@ -635,6 +664,101 @@ class HordeGame {
       recoilVx: 0,
       recoilVy: 0,
     });
+  }
+
+  spawnCyborgianSplit(parentEnemy, io) {
+    if (!parentEnemy || parentEnemy.hasSplit) return;
+    parentEnemy.hasSplit = true;
+
+    // Calculate perpendicular axis to parent's orientation / movement towards Granny
+    let angle = 0;
+    if (parentEnemy.facing && (parentEnemy.facing.x !== 0 || parentEnemy.facing.y !== 0)) {
+      angle = Math.atan2(parentEnemy.facing.y, parentEnemy.facing.x);
+    } else {
+      angle = Math.atan2(ARENA_CENTER.y - parentEnemy.y, ARENA_CENTER.x - parentEnemy.x);
+    }
+
+    const perpAngle = angle + Math.PI / 2;
+    const perpX = Math.cos(perpAngle);
+    const perpY = Math.sin(perpAngle);
+    const offsetDist = 48; // Centers will be 96px apart, completely preventing any collision overlap (radii are 26px)
+
+    const childConfigs = [
+      {
+        type: "cyborgian_split_1",
+        config: ENEMY_CONFIG.cyborgian_split_1,
+        sign: 1,
+      },
+      {
+        type: "cyborgian_split_2",
+        config: ENEMY_CONFIG.cyborgian_split_2,
+        sign: -1,
+      },
+    ];
+
+    const spawnedChildren = [];
+
+    for (const item of childConfigs) {
+      const cfg = item.config;
+      let cx = parentEnemy.x + perpX * offsetDist * item.sign;
+      let cy = parentEnemy.y + perpY * offsetDist * item.sign;
+
+      // Ensure spawned children remain inside arena
+      const distFromCenter = Math.hypot(cx - ARENA_CENTER.x, cy - ARENA_CENTER.y);
+      const maxDist = ARENA_RADIUS - cfg.radius - 8;
+      if (distFromCenter > maxDist) {
+        cx = ARENA_CENTER.x + ((cx - ARENA_CENTER.x) / (distFromCenter || 1)) * maxDist;
+        cy = ARENA_CENTER.y + ((cy - ARENA_CENTER.y) / (distFromCenter || 1)) * maxDist;
+      }
+
+      const child = {
+        id: this.nextEnemyId++,
+        type: item.type,
+        name: cfg.name,
+        texture: cfg.texture,
+        width: cfg.width,
+        height: cfg.height,
+        radius: cfg.radius,
+        speed: cfg.speed, // Fast speed: 240
+        damage: cfg.damage,
+        maxHp: 1, // 1-hit kill
+        hp: 1,
+        xp: cfg.xp,
+        hasDodge: false,
+        dodgeCooldown: 4000,
+        dodgeDistance: 110,
+        dodgeReadyAt: 0,
+        dodgeUntil: 0,
+        dodgeVx: 0,
+        dodgeVy: 0,
+        frozenUntil: 0,
+        stunnedUntil: 0,
+        x: cx,
+        y: cy,
+        facing: { x: perpX * item.sign, y: perpY * item.sign },
+        lastAttackAt: 0,
+        lastPlayerAttackAt: 0,
+        attackCooldown: 600,
+        // Burst impulse pushing outward away from split origin
+        recoilVx: perpX * item.sign * 220,
+        recoilVy: perpY * item.sign * 220,
+        isSplitChild: true,
+      };
+
+      this.enemies.push(child);
+      spawnedChildren.push(child);
+    }
+
+    if (io && this.room && spawnedChildren.length === 2) {
+      io.to(this.room).emit("cyborgian_split", {
+        parentId: parentEnemy.id,
+        x: parentEnemy.x,
+        y: parentEnemy.y,
+        angle: angle,
+        child1: { id: spawnedChildren[0].id, x: spawnedChildren[0].x, y: spawnedChildren[0].y },
+        child2: { id: spawnedChildren[1].id, x: spawnedChildren[1].x, y: spawnedChildren[1].y },
+      });
+    }
   }
 
   spawnBoss(activeCount, io) {
@@ -1710,6 +1834,9 @@ class HordeGame {
                 killerId: p.id,
               });
               this.enemies.splice(ei, 1);
+              if (enemy.type === "cyborgian_9" || enemy.isSplitter) {
+                this.spawnCyborgianSplit(enemy, io);
+              }
               enemyKilledThisTick = true;
               break;
             }
@@ -1752,6 +1879,9 @@ class HordeGame {
                 killerId: p.id,
               });
               this.enemies.splice(ei, 1);
+              if (enemy.type === "cyborgian_9" || enemy.isSplitter) {
+                this.spawnCyborgianSplit(enemy, io);
+              }
               enemyKilledThisTick = true;
               break;
             }
@@ -1806,6 +1936,9 @@ class HordeGame {
                 killerId: p.id,
               });
               this.enemies.splice(ei, 1);
+              if (enemy.type === "cyborgian_9" || enemy.isSplitter) {
+                this.spawnCyborgianSplit(enemy, io);
+              }
               enemyKilledThisTick = true;
               break;
             }
@@ -3553,6 +3686,9 @@ setInterval(() => {
               xp: enemy.xp,
             });
             horde.enemies.splice(ei, 1);
+            if (enemy.type === "cyborgian_9" || enemy.isSplitter) {
+              horde.spawnCyborgianSplit(enemy, io);
+            }
           }
         }
       }
@@ -3861,6 +3997,9 @@ setInterval(() => {
                 xp: enemy.xp,
               });
               horde.enemies.splice(ei, 1);
+              if (enemy.type === "cyborgian_9" || enemy.isSplitter) {
+                horde.spawnCyborgianSplit(enemy, io);
+              }
             }
             bullets.splice(i, 1);
             hitEnemy = true;
