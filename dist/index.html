@@ -2555,7 +2555,7 @@
         z-index: 2;
       }
 
-      /* Boss Announcement Video Overlay */
+      /* Boss Announcement Overlay */
       #boss-announcement-overlay {
         position: absolute;
         inset: 0;
@@ -2563,9 +2563,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(3, 6, 12, 0.88);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        background: transparent !important;
         pointer-events: none;
         transition: opacity 0.5s ease;
       }
@@ -2576,57 +2574,67 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 12px;
+        gap: 16px;
         animation: bossCardPop 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        pointer-events: none;
       }
       @keyframes bossCardPop {
-        0% { transform: scale(0.85); opacity: 0; }
+        0% { transform: scale(0.8); opacity: 0; }
         100% { transform: scale(1); opacity: 1; }
       }
       .boss-announcement-nametag {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2px;
+        gap: 4px;
+        pointer-events: none;
       }
       .boss-nametag-prefix {
         font-family: var(--font-mono);
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 900;
         letter-spacing: 3px;
         color: #ff334b;
-        text-shadow: 0 0 12px rgba(255, 51, 75, 0.9);
+        text-shadow: 0 0 16px rgba(255, 51, 75, 1);
       }
       .boss-nametag-title {
         font-family: var(--font-display, system-ui);
-        font-size: 44px;
+        font-size: 52px;
         font-weight: 950;
-        letter-spacing: 4px;
+        letter-spacing: 6px;
         color: #ffffff;
         margin: 0;
-        text-shadow: 0 0 24px rgba(255, 51, 75, 0.9), 0 0 48px rgba(255, 190, 26, 0.5);
+        text-shadow: 0 0 30px rgba(255, 51, 75, 0.95), 0 0 60px rgba(255, 190, 26, 0.6);
       }
       .boss-nametag-sub {
         font-family: var(--font-mono);
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 800;
-        letter-spacing: 2px;
+        letter-spacing: 3px;
         color: var(--accent-gold);
         text-transform: uppercase;
+        text-shadow: 0 0 12px rgba(255, 190, 26, 0.8);
       }
-      .boss-video-frame {
-        width: 480px;
-        height: 270px;
-        border-radius: 14px;
-        overflow: hidden;
-        border: 2px solid rgba(255, 51, 75, 0.7);
-        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 32px rgba(255, 51, 75, 0.45);
-        background: #000;
+      .boss-gif-frame {
+        width: auto;
+        height: auto;
+        border: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: visible;
+        pointer-events: none;
       }
-      #boss-announcement-video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+      #boss-announcement-img {
+        max-height: min(68vh, 580px);
+        max-width: 90vw;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 0 32px rgba(255, 51, 75, 0.8)) drop-shadow(0 0 55px rgba(255, 190, 26, 0.45));
       }
 
       /* Horde Center Announcement */
@@ -3525,7 +3533,7 @@
         color: #fff;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-Dt05BkyQ.js"></script>
+    <script type="module" crossorigin src="/assets/index-KQg8dMEo.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -3591,7 +3599,7 @@
           </div>
         </div>
 
-        <!-- Boss Announcement Video & Intro Overlay -->
+        <!-- Boss Announcement GIF & Intro Overlay -->
         <div id="boss-announcement-overlay" class="hidden">
           <div class="boss-announcement-card">
             <div class="boss-announcement-nametag">
@@ -3599,8 +3607,8 @@
               <h1 class="boss-nametag-title">3x T</h1>
               <span class="boss-nametag-sub">THE ANCIENT SAHUR CONQUEROR</span>
             </div>
-            <div class="boss-video-frame">
-              <video id="boss-announcement-video" playsinline preload="auto"></video>
+            <div class="boss-gif-frame">
+              <img id="boss-announcement-img" alt="Boss Announcement" />
             </div>
           </div>
         </div>
