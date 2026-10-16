@@ -8,6 +8,7 @@
     <style>
       :root {
         color-scheme: dark;
+        --cursor-crosshair: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg stroke='%23000000' stroke-width='3' stroke-linecap='round' stroke-opacity='0.85'%3E%3Cline x1='7' y1='16' x2='12' y2='16'/%3E%3Cline x1='20' y1='16' x2='25' y2='16'/%3E%3Cline x1='16' y1='7' x2='16' y2='12'/%3E%3Cline x1='16' y1='20' x2='16' y2='25'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='2.8' fill='%23000000' fill-opacity='0.85'/%3E%3Cg stroke='%23ffffff' stroke-width='1.5' stroke-linecap='round'%3E%3Cline x1='7' y1='16' x2='12' y2='16'/%3E%3Cline x1='20' y1='16' x2='25' y2='16'/%3E%3Cline x1='16' y1='7' x2='16' y2='12'/%3E%3Cline x1='16' y1='20' x2='16' y2='25'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='1.4' fill='%23ff334b'/%3E%3C/svg%3E") 16 16, crosshair;
         --bg-root: #06080d;
         --surface-glass: rgba(12, 16, 26, 0.78);
         --surface-card: rgba(16, 21, 34, 0.88);
@@ -75,6 +76,7 @@
         overflow: hidden;
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.04);
         background: #060911;
+        cursor: var(--cursor-crosshair);
       }
       #game {
         display: block;
@@ -82,7 +84,7 @@
         height: 100%;
         outline: none;
         touch-action: none;
-        cursor: crosshair;
+        cursor: var(--cursor-crosshair);
         background: #060911;
       }
       .hidden { display: none !important; }
@@ -152,6 +154,7 @@
         background: radial-gradient(circle at 50% 50%, rgba(8, 12, 22, 0.85), rgba(4, 6, 11, 0.96) 80%);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
+        cursor: default;
       }
 
       /* MAIN MENU */
@@ -1297,6 +1300,7 @@
         background: rgba(3, 6, 12, 0.82);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
+        cursor: default;
       }
       #settings-popup.hidden {
         display: none !important;
@@ -2165,6 +2169,7 @@
         display: grid;
         place-items: center;
         padding: 16px;
+        cursor: default;
       }
       .sigma-modal-backdrop {
         position: absolute;
@@ -2682,6 +2687,7 @@
         overflow-y: auto;
         perspective: 1400px;
         pointer-events: auto;
+        cursor: default;
       }
       .horde-modal-backdrop {
         position: fixed;
@@ -3131,6 +3137,7 @@
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
         animation: rpgBackdropFade 0.25s ease-out;
+        cursor: default;
       }
       .arsenal-modal-container {
         position: relative;
@@ -3530,10 +3537,1152 @@
         padding: 1px 5px;
         border-radius: 4px;
         font-family: var(--font-mono);
-        color: #fff;
+      }
+      /* ===================================================================
+         TURRET COLLECTION, CS CASE OPENING, AND ADMIN GIFTING STYLES
+         =================================================================== */
+      :root {
+        --rarity-starter: #94a3b8;
+        --rarity-common: #3b82f6;
+        --rarity-rare: #a855f7;
+        --rarity-legendary: #ffbe1a;
+      }
+
+      /* Key & Fragment Counters */
+      .key-badge-dock {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .key-counter-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        background: rgba(255, 190, 26, 0.12);
+        border: 1px solid rgba(255, 190, 26, 0.45);
+        color: #ffbe1a;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.05em;
+        box-shadow: 0 0 15px rgba(255, 190, 26, 0.2);
+        user-select: none;
+      }
+      .key-counter-pill.mini {
+        padding: 4px 10px;
+        font-size: 11px;
+      }
+      .fragment-counter-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        background: rgba(168, 85, 247, 0.12);
+        border: 1px solid rgba(168, 85, 247, 0.45);
+        color: #c084fc;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.05em;
+        user-select: none;
+      }
+      .quick-craft-btn {
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: #a855f7;
+        color: #ffffff;
+        border: none;
+        font-size: 10px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+      }
+      .quick-craft-btn:hover:not(:disabled) {
+        background: #c084fc;
+        transform: scale(1.05);
+        box-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+      }
+      .quick-craft-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* Shared Close Button */
+      .close-modal-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border-med);
+        color: var(--text-primary);
+        font-size: 15px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s, transform 0.2s;
+      }
+      .close-modal-btn:hover {
+        background: rgba(255, 51, 75, 0.85);
+        border-color: #ff334b;
+        transform: rotate(90deg);
+      }
+
+      /* === TURRET COLLECTION SCREEN === */
+      .hangar-container {
+        width: min(1040px, 94vw);
+        max-height: 88vh;
+        display: flex;
+        flex-direction: column;
+        padding: 24px;
+        border-radius: 20px;
+        overflow: hidden;
+      }
+      .hangar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .hangar-title-wrap h2 {
+        margin: 4px 0 0;
+        font-size: 22px;
+        font-weight: 850;
+        letter-spacing: 0.05em;
+      }
+      .hangar-header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .hangar-body {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 20px;
+        margin-top: 16px;
+        overflow-y: auto;
+        min-height: 480px;
+      }
+      @media (max-width: 820px) {
+        .hangar-body {
+          grid-template-columns: 1fr;
+        }
+      }
+      .turret-collection-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+        align-content: start;
+        padding-right: 6px;
+      }
+      .turret-collection-card {
+        position: relative;
+        padding: 12px 10px;
+        border-radius: 12px;
+        background: rgba(16, 21, 34, 0.85);
+        border: 1.5px solid var(--border-subtle);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        cursor: pointer;
+        transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        user-select: none;
+      }
+      .turret-collection-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--border-med);
+      }
+      .turret-collection-card.is-selected {
+        border-color: #00e5ff !important;
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);
+      }
+      .turret-collection-card.is-equipped {
+        border-color: #ffbe1a !important;
+        box-shadow: 0 0 20px rgba(255, 190, 26, 0.35);
+      }
+      .turret-collection-card.is-locked {
+        opacity: 0.62;
+        filter: grayscale(0.5);
+      }
+      .card-rarity-tag {
+        font-family: var(--font-mono);
+        font-size: 8px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-bottom: 6px;
+      }
+      .turret-card-img-wrap {
+        width: 72px;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 6px 0;
+      }
+      .turret-card-img-wrap img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.7));
+      }
+      .turret-card-name {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+        line-height: 1.2;
+      }
+      .turret-card-status {
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        padding: 2px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      .turret-card-status.equipped {
+        background: rgba(255, 190, 26, 0.2);
+        color: #ffbe1a;
+        border: 1px solid rgba(255, 190, 26, 0.4);
+      }
+      .turret-card-status.unlocked {
+        background: rgba(0, 229, 255, 0.15);
+        color: #00e5ff;
+        border: 1px solid rgba(0, 229, 255, 0.3);
+      }
+      .turret-card-status.locked {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-muted);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      /* Inspector Pane */
+      .turret-inspector {
+        padding: 22px;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: rgba(14, 18, 30, 0.92);
+      }
+      .inspector-preview-wrap {
+        position: relative;
+        width: 100%;
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at center, rgba(0, 229, 255, 0.08), transparent 70%);
+        border-radius: 12px;
+        border: 1px solid var(--border-subtle);
+        overflow: hidden;
+      }
+      .inspector-halo {
+        position: absolute;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        border: 1.5px dashed rgba(0, 229, 255, 0.35);
+        animation: haloSpin 12s linear infinite;
+      }
+      @keyframes haloSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .inspector-turret-disc {
+        position: relative;
+        width: 90px;
+        height: 90px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .rotating-turret-preview {
+        max-width: 80px;
+        max-height: 80px;
+        object-fit: contain;
+        filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.9));
+        animation: turretInspectSpin 8s ease-in-out infinite alternate;
+      }
+      @keyframes turretInspectSpin {
+        0% { transform: rotate(-35deg); }
+        100% { transform: rotate(35deg); }
+      }
+      .inspector-badge-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .rarity-pill {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+      .equip-status-pill {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-secondary);
+      }
+      .inspector-name {
+        margin: 0 0 4px;
+        font-size: 19px;
+        font-weight: 850;
+        color: #ffffff;
+      }
+      .inspector-desc {
+        margin: 0;
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+      .inspector-stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .inspector-stat {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .inspector-stat .stat-lbl {
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+      }
+      .inspector-stat .stat-val {
+        font-size: 13px;
+        font-weight: 850;
+        color: #ffffff;
+        font-family: var(--font-mono);
+      }
+      .inspector-ability-box {
+        background: rgba(0, 229, 255, 0.04);
+        border: 1px solid rgba(0, 229, 255, 0.2);
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      .ability-box-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #00e5ff;
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+      .inspector-ability-box p {
+        margin: 0;
+        font-size: 11px;
+        color: #cbd5e1;
+        line-height: 1.4;
+      }
+      .inspector-actions {
+        margin-top: auto;
+      }
+      .inspector-equip-btn {
+        width: 100%;
+        height: 42px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+
+      /* === CS-STYLE CASES SCREEN === */
+      .case-room-container {
+        width: min(960px, 94vw);
+        max-height: 90vh;
+        padding: 24px;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .case-room-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .case-header-left h2 {
+        margin: 4px 0 0;
+        font-size: 22px;
+        font-weight: 850;
+      }
+      .case-header-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .case-view-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 14px;
+        overflow-y: auto;
+      }
+      .case-crate-showcase {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 16px 20px;
+        background: radial-gradient(circle at 50% 30%, rgba(255, 190, 26, 0.12), transparent 70%);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 190, 26, 0.25);
+        text-align: center;
+      }
+      .case-crate-box {
+        position: relative;
+        width: 90px;
+        height: 90px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(255, 190, 26, 0.2), rgba(245, 158, 11, 0.05));
+        border: 2px solid rgba(255, 190, 26, 0.5);
+        border-radius: 18px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 25px rgba(255, 190, 26, 0.25);
+        margin-bottom: 12px;
+      }
+      .crate-icon {
+        font-size: 38px;
+        color: #ffbe1a;
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+      }
+      .crate-badge {
+        position: absolute;
+        bottom: -8px;
+        font-family: var(--font-mono);
+        font-size: 8px;
+        font-weight: 900;
+        background: #ffbe1a;
+        color: #000000;
+        padding: 2px 6px;
+        border-radius: 4px;
+        letter-spacing: 0.08em;
+      }
+      .crate-title {
+        margin: 0 0 4px;
+        font-size: 18px;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        color: #ffffff;
+      }
+      .crate-subtitle {
+        margin: 0 0 16px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .open-case-btn {
+        height: 46px;
+        padding: 0 32px;
+        font-size: 13.5px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        background: linear-gradient(135deg, #ffbe1a 0%, #f59e0b 100%);
+        color: #000000;
+        box-shadow: 0 6px 28px rgba(255, 190, 26, 0.45);
+        border: none;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .open-case-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #ffd166 0%, #ffbe1a 100%);
+        box-shadow: 0 8px 34px rgba(255, 190, 26, 0.6);
+        transform: translateY(-2px);
+      }
+      .open-case-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        filter: grayscale(0.5);
+      }
+
+      .case-contents-dock {
+        background: rgba(10, 14, 24, 0.7);
+        border: 1px solid var(--border-subtle);
+        border-radius: 14px;
+        padding: 16px;
+      }
+      .contents-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .duplicates-tip {
+        font-size: 10.5px;
+        color: #c084fc;
+      }
+      .contents-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 10px;
+      }
+      .contents-card {
+        background: rgba(16, 21, 34, 0.85);
+        border-radius: 10px;
+        border: 1px solid var(--border-subtle);
+        border-bottom: 3.5px solid var(--card-border-color, #3b82f6);
+        padding: 10px 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .contents-card-rate {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 850;
+        color: var(--card-rate-color, #00e5ff);
+        margin-bottom: 4px;
+      }
+      .contents-card img {
+        width: 56px;
+        height: 56px;
+        object-fit: contain;
+        margin: 4px 0;
+        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6));
+      }
+      .contents-card-name {
+        font-size: 10.5px;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1.2;
+      }
+      .contents-card-rarity {
+        font-size: 8.5px;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--card-rate-color, #94a3b8);
+        margin-top: 3px;
+      }
+
+      /* === CS ROULETTE REEL === */
+      .roulette-status-text {
+        text-align: center;
+        font-size: 14px;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        color: #ffbe1a;
+        margin-bottom: 10px;
+        animation: pulseText 1.5s infinite;
+      }
+      @keyframes pulseText {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; text-shadow: 0 0 12px rgba(255, 190, 26, 0.6); }
+      }
+      .cs-roulette-wrapper {
+        position: relative;
+        width: 100%;
+        height: 195px;
+        background: #060a12;
+        border: 2px solid rgba(255, 190, 26, 0.45);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.95), 0 12px 40px rgba(0, 0, 0, 0.8);
+      }
+      .roulette-viewport {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+      }
+      .roulette-strip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        will-change: transform;
+        padding: 0 20px;
+      }
+      .roulette-marker {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 100;
+        width: 0;
+        height: 0;
+        border-left: 12px solid transparent;
+        border-right: 12px solid transparent;
+      }
+      .roulette-marker.marker-top {
+        top: 0;
+        border-top: 20px solid #ffbe1a;
+        filter: drop-shadow(0 2px 10px rgba(255, 190, 26, 0.9));
+      }
+      .roulette-marker.marker-bottom {
+        bottom: 0;
+        border-bottom: 20px solid #ffbe1a;
+        filter: drop-shadow(0 -2px 10px rgba(255, 190, 26, 0.9));
+      }
+      .roulette-center-line {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(180deg, rgba(255, 190, 26, 0.9), rgba(255, 51, 75, 0.9));
+        transform: translateX(-50%);
+        z-index: 90;
+        pointer-events: none;
+        box-shadow: 0 0 14px rgba(255, 190, 26, 0.9);
+      }
+      .roulette-card {
+        flex: 0 0 145px;
+        height: 165px;
+        background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.05), #0d121f 75%);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 4px solid var(--card-rarity-color, #3b82f6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 8px;
+        text-align: center;
+        user-select: none;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+      }
+      .roulette-card img {
+        width: 72px;
+        height: 72px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8));
+      }
+      .roulette-card-name {
+        margin-top: 8px;
+        font-size: 11px;
+        font-weight: 850;
+        color: #ffffff;
+        line-height: 1.2;
+      }
+      .roulette-card-rarity {
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--card-rarity-color, #3b82f6);
+        margin-top: 3px;
+      }
+      .roulette-audio-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      /* === REWARD REVEAL POPUP === */
+      .case-reward-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 500;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        animation: rewardFadeIn 0.3s ease-out;
+      }
+      @keyframes rewardFadeIn {
+        from { opacity: 0; transform: scale(0.96); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .reward-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(3, 6, 12, 0.88);
+        backdrop-filter: blur(16px);
+      }
+      .reward-card {
+        position: relative;
+        z-index: 10;
+        width: min(440px, 92vw);
+        padding: 32px 24px;
+        border-radius: 20px;
+        border: 2px solid var(--reward-border-color, #ffbe1a);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 40px var(--reward-glow-color, rgba(255, 190, 26, 0.4));
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        background: #0a0f1c;
+      }
+      .reward-header {
+        margin-bottom: 12px;
+      }
+      .reward-badge {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 4px 12px;
+        border-radius: 6px;
+        color: var(--reward-border-color, #ffbe1a);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .reward-turret-stage {
+        width: 140px;
+        height: 140px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 12px 0;
+        position: relative;
+      }
+      .reward-turret-img {
+        max-width: 120px;
+        max-height: 120px;
+        object-fit: contain;
+        filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.9));
+        animation: rewardTurretBounce 3s ease-in-out infinite alternate;
+      }
+      @keyframes rewardTurretBounce {
+        0% { transform: translateY(0) rotate(-6deg); }
+        100% { transform: translateY(-8px) rotate(6deg); }
+      }
+      .reward-turret-name {
+        margin: 0 0 6px;
+        font-size: 24px;
+        font-weight: 900;
+        color: #ffffff;
+      }
+      .reward-turret-ability {
+        margin: 0 0 16px;
+        font-size: 12.5px;
+        color: var(--text-secondary);
+        max-width: 320px;
+      }
+      .duplicate-notice {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        background: rgba(168, 85, 247, 0.15);
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        color: #d8b4fe;
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 16px;
+      }
+      .reward-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+      }
+
+      /* === ADMIN CONSOLE SCREEN === */
+      .admin-container {
+        width: min(940px, 94vw);
+        max-height: 88vh;
+        padding: 24px;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .admin-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .admin-badge {
+        color: #ff334b !important;
+      }
+      .admin-title-wrap h2 {
+        margin: 4px 0 0;
+        font-size: 22px;
+        font-weight: 850;
+      }
+      .admin-auth-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .admin-id-pill {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: rgba(255, 51, 75, 0.15);
+        border: 1px solid rgba(255, 51, 75, 0.4);
+        color: #ff334b;
+      }
+      .admin-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 16px;
+        overflow-y: auto;
+      }
+      @media (max-width: 780px) {
+        .admin-body {
+          grid-template-columns: 1fr;
+        }
+      }
+      .admin-gift-form {
+        padding: 20px;
+        border-radius: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .form-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #ffbe1a;
+      }
+      .form-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 850;
+      }
+      .form-desc {
+        margin: 0;
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+      .form-group label {
+        display: block;
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+      }
+      .input-with-icon {
+        display: flex;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 0 12px;
+        height: 42px;
+      }
+      .input-with-icon i {
+        color: #94a3b8;
+        margin-right: 10px;
+      }
+      .admin-input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #ffffff;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        width: 100%;
+      }
+      .field-hint {
+        display: block;
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+      .quantity-input-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .quantity-input {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 0 12px;
+        height: 42px;
+      }
+      .quick-qty-chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .qty-chip {
+        padding: 4px 10px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .qty-chip:hover {
+        background: rgba(255, 190, 26, 0.18);
+        border-color: #ffbe1a;
+        color: #ffbe1a;
+      }
+      .admin-submit-btn {
+        width: 100%;
+        height: 44px;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .admin-feedback-msg {
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .admin-feedback-msg.success {
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        color: #34d399;
+      }
+      .admin-feedback-msg.error {
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #f87171;
+      }
+
+      .admin-history-panel {
+        padding: 20px;
+        border-radius: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .history-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #00e5ff;
+      }
+      .history-title h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 850;
+      }
+      .refresh-history-btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border-subtle);
+        border-radius: 6px;
+        color: var(--text-primary);
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+      .refresh-history-btn:hover {
+        transform: rotate(180deg);
+      }
+      .history-table-wrapper {
+        overflow-y: auto;
+        max-height: 380px;
+      }
+      .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+      .history-table th {
+        text-align: left;
+        padding: 8px;
+        color: var(--text-muted);
+        font-weight: 850;
+        font-size: 9px;
+        letter-spacing: 0.06em;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .history-table td {
+        padding: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+      }
+      .status-pill {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 8.5px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+      .status-pill.pending {
+        background: rgba(255, 190, 26, 0.15);
+        color: #ffbe1a;
+      }
+      .status-pill.claimed {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+      }
+      .status-pill.declined {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+      }
+      .empty-table-msg {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 24px !important;
+      }
+
+      /* === REAL-TIME GIFT POPUP MODAL === */
+      .gift-popup-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        animation: giftPopIn 0.3s cubic-bezier(0.18, 1.25, 0.32, 1);
+        cursor: default;
+      }
+      @keyframes giftPopIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .gift-popup-backdrop {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 40%, rgba(255, 190, 26, 0.2), rgba(3, 6, 12, 0.95) 80%);
+        backdrop-filter: blur(16px);
+      }
+      .gift-popup-card {
+        position: relative;
+        z-index: 10;
+        width: min(420px, 92vw);
+        padding: 32px 24px;
+        border-radius: 20px;
+        border: 2px solid rgba(255, 190, 26, 0.6);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.9), 0 0 40px rgba(255, 190, 26, 0.35);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        background: #090e1a;
+      }
+      .gift-glowing-chest {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+      }
+      .gift-chest-icon {
+        font-size: 56px;
+        filter: drop-shadow(0 8px 16px rgba(255, 190, 26, 0.5));
+        animation: chestFloat 2.5s ease-in-out infinite alternate;
+      }
+      @keyframes chestFloat {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-8px) scale(1.04); }
+      }
+      .gift-key-sparkle {
+        position: absolute;
+        top: 0;
+        right: 12px;
+        font-size: 24px;
+        animation: keyWiggle 2s infinite;
+      }
+      @keyframes keyWiggle {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(15deg) scale(1.1); }
+      }
+      .gift-badge-tag {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.12em;
+        color: #ffbe1a;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(255, 190, 26, 0.15);
+      }
+      .gift-headline {
+        margin: 8px 0 6px;
+        font-size: 22px;
+        font-weight: 900;
+        color: #ffffff;
+      }
+      .gift-message {
+        margin: 0 0 20px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+      .gift-message strong {
+        color: #ffbe1a;
+      }
+      .gift-popup-actions {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        justify-content: center;
+      }
+      .claim-gift-btn {
+        flex: 1;
+        height: 44px;
+        font-weight: 850;
+        background: linear-gradient(135deg, #ffbe1a 0%, #f59e0b 100%);
+        color: #000000;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .decline-gift-btn {
+        height: 44px;
+        padding: 0 16px;
+        color: var(--text-muted);
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-pteZ7lal.js"></script>
+    <script type="module" crossorigin src="/assets/index-BgG0IC3-.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -3820,10 +4969,33 @@
                 <button type="button" id="btn-save-username" class="callsign-save-btn">SAVE</button>
               </div>
             </div>
+            <!-- Key & Fragment Currency Dock -->
+            <div id="menu-key-dock" class="menu-key-dock">
+              <div class="currency-pill key-pill" title="Turret Weapon Keys (Used to open Turret Weapon Cases)">
+                <i class="fa-solid fa-key" style="color: #ffd166;"></i>
+                <div class="currency-val-wrap">
+                  <span class="currency-label">KEYS</span>
+                  <span id="menu-key-count" class="currency-count">0</span>
+                </div>
+              </div>
+              <div class="currency-pill frag-pill" title="Turret Weapon Fragments (100 Fragments = 1 Key)">
+                <i class="fa-solid fa-gem" style="color: #00e5ff;"></i>
+                <div class="currency-val-wrap">
+                  <span class="currency-label">FRAGMENTS</span>
+                  <span id="menu-frag-count" class="currency-count">0 / 100</span>
+                </div>
+                <button type="button" id="btn-craft-key-quick" class="quick-craft-btn" title="Craft 1 Key from 100 Fragments">
+                  <i class="fa-solid fa-hammer"></i> CRAFT
+                </button>
+              </div>
+            </div>
           </div>
           <div class="menu-nav">
             <button id="play-button" class="btn btn-primary" disabled>Deploying…</button>
             <button id="character-button" class="btn">Select Fighter</button>
+            <button id="turrets-button" class="btn"><i class="fa-solid fa-crosshairs" style="color: #00e5ff; margin-right: 6px;"></i>Turrets</button>
+            <button id="cases-button" class="btn"><i class="fa-solid fa-box-open" style="color: #ffd166; margin-right: 6px;"></i>Cases</button>
+            <button id="admin-button" class="btn hidden" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;"><i class="fa-solid fa-shield-halved" style="margin-right: 6px;"></i>Admin</button>
             <button class="btn settings-button">Settings</button>
           </div>
           <div class="connection-pill">
@@ -4295,6 +5467,300 @@
             <i class="fa-solid fa-circle-info" style="color: #00e5ff;"></i> Press <kbd style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); padding: 2px 6px; border-radius: 4px; color: #fff;">TAB</kbd> or <kbd style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); padding: 2px 6px; border-radius: 4px; color: #fff;">ESC</kbd> to toggle anytime
           </span>
           <button id="btn-close-arsenal-footer" class="btn btn-primary" type="button" style="padding: 7px 22px; font-size: 11px; font-weight: 850; letter-spacing: 0.08em; border-radius: 8px;">RETURN TO COMBAT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TURRET COLLECTION / HANGAR MODAL -->
+    <section id="turrets-screen" class="screen hidden" aria-modal="true" role="dialog">
+      <div class="hangar-container modal-frame">
+        <div class="hangar-header">
+          <div class="hangar-title-wrap">
+            <span class="badge-tag">TACTICAL ARSENAL</span>
+            <h2>TURRET COLLECTION</h2>
+          </div>
+          <div class="hangar-header-right">
+            <div class="currency-pill key-pill" title="Turret Weapon Keys">
+              <i class="fa-solid fa-key" style="color: #ffd166;"></i>
+              <span id="hangar-key-count" class="currency-count">0</span>
+            </div>
+            <button id="close-turrets-screen" class="close-modal-btn" type="button" aria-label="Close Turrets">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="hangar-body">
+          <div class="turret-collection-grid" id="turret-grid">
+            <!-- Populated dynamically by main.js with all 7 turrets -->
+          </div>
+
+          <div class="turret-inspector modal-frame" id="turret-inspector">
+            <div class="inspector-preview-wrap">
+              <div class="inspector-halo" id="inspector-halo"></div>
+              <div class="inspector-turret-disc">
+                <img id="inspector-img" class="rotating-turret-preview" src="/turrets/default.png" alt="Turret Preview" />
+              </div>
+            </div>
+
+            <div class="inspector-badge-row">
+              <span id="inspector-rarity-pill" class="rarity-pill rarity-starter">STARTER</span>
+              <span id="inspector-equip-pill" class="equip-status-pill">EQUIPPED</span>
+            </div>
+
+            <h3 id="inspector-name" class="inspector-name">DEFAULT TURRET</h3>
+            <p id="inspector-desc" class="inspector-desc">Standard-issue rapid kinetic point-defense turret.</p>
+
+            <div class="inspector-stats-grid">
+              <div class="inspector-stat">
+                <span class="stat-lbl">DAMAGE / DPS</span>
+                <span id="inspector-stat-damage" class="stat-val">100%</span>
+              </div>
+              <div class="inspector-stat">
+                <span class="stat-lbl">HEALTH</span>
+                <span id="inspector-stat-health" class="stat-val">100%</span>
+              </div>
+              <div class="inspector-stat">
+                <span class="stat-lbl">FIRING CADENCE</span>
+                <span id="inspector-stat-rate" class="stat-val">1.0x</span>
+              </div>
+              <div class="inspector-stat">
+                <span class="stat-lbl">TARGETING RANGE</span>
+                <span id="inspector-stat-range" class="stat-val">280 px</span>
+              </div>
+            </div>
+
+            <div class="inspector-ability-box">
+              <div class="ability-box-head">
+                <i class="fa-solid fa-bolt"></i>
+                <strong id="inspector-ability-title">CORE SPECIALTY</strong>
+              </div>
+              <p id="inspector-ability-desc">Balanced kinetic projectile cannon with standard ballistic behavior.</p>
+            </div>
+
+            <div class="inspector-actions">
+              <button type="button" id="inspector-equip-btn" class="btn btn-primary inspector-equip-btn">
+                EQUIP TURRET
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CS-STYLE CASES SCREEN -->
+    <section id="cases-screen" class="screen hidden" aria-modal="true" role="dialog">
+      <div class="case-room-container modal-frame">
+        <div class="case-room-header">
+          <div class="case-header-left">
+            <span class="badge-tag" style="color: #ffd166; border-color: rgba(255, 190, 26, 0.4);">LOOT REQUISITIONS</span>
+            <h2>TURRET WEAPON CASES</h2>
+          </div>
+          <div class="case-header-right">
+            <div class="currency-pill key-pill" title="Turret Weapon Keys">
+              <i class="fa-solid fa-key" style="color: #ffd166;"></i>
+              <span id="case-room-key-count" class="currency-count">0 KEYS</span>
+            </div>
+            <div class="currency-pill frag-pill" title="Turret Weapon Fragments">
+              <i class="fa-solid fa-gem" style="color: #00e5ff;"></i>
+              <span id="case-room-frag-count" class="currency-count">0 / 100</span>
+              <button type="button" id="btn-craft-key-case-room" class="quick-craft-btn" title="Craft 1 Key from 100 Fragments">
+                <i class="fa-solid fa-hammer"></i> CRAFT
+              </button>
+            </div>
+            <button id="close-cases-screen" class="close-modal-btn" type="button" aria-label="Close Cases">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="case-view-panel">
+          <!-- Top Showcase / Roulette Area -->
+          <div class="case-crate-showcase">
+            <div id="case-standby-view">
+              <div class="case-crate-box">
+                <i class="fa-solid fa-box-open crate-icon"></i>
+                <span class="crate-badge">SERIES 1</span>
+              </div>
+              <h3 class="crate-title">DEFENSE SUPPLY CRATE</h3>
+              <p class="crate-subtitle">Requires 1 Turret Weapon Key. Unlocks 1 top-tier tactical turret skin or duplicate fragment compensation.</p>
+              <button type="button" id="btn-open-case" class="open-case-btn">
+                <i class="fa-solid fa-key"></i> UNLOCK CASE (1 KEY)
+              </button>
+            </div>
+
+            <!-- CS:GO / CS2 Style Horizontal Roulette Reel (Revealed on Open) -->
+            <div id="case-roulette-view" class="hidden" style="width: 100%;">
+              <div class="roulette-status-text">DECELERATING REQUISITION REEL…</div>
+              <div class="cs-roulette-wrapper" id="cs-roulette-wrapper">
+                <div class="roulette-marker marker-top"></div>
+                <div class="roulette-center-line"></div>
+                <div class="roulette-marker marker-bottom"></div>
+                <div class="roulette-viewport">
+                  <div class="roulette-strip" id="roulette-strip">
+                    <!-- 60 cards populated during spinning animation -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drop Rates & Case Contents -->
+          <div class="case-contents-dock">
+            <div class="contents-header">
+              <span>CASE CONTENTS & PROBABILITY SPECTRUM</span>
+              <span class="duplicates-tip"><i class="fa-solid fa-recycle"></i> Duplicates convert into fragments (100 = 1 Key)</span>
+            </div>
+            <div class="contents-cards-grid" id="case-contents-grid">
+              <!-- Dynamically populated from turretConfig: Fire, Ice, Double Barrel, Alien, Triple Barrel, Gold -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REWARD REVEAL SHOWCASE POPUP -->
+    <div id="case-reward-modal" class="case-reward-overlay hidden" aria-modal="true" role="dialog">
+      <div class="reward-backdrop"></div>
+      <div class="reward-card" id="reward-card-frame">
+        <div class="reward-header">
+          <span id="reward-badge" class="reward-badge">NEW UNLOCK</span>
+        </div>
+        <div class="reward-turret-stage">
+          <img id="reward-turret-img" class="reward-turret-img" src="/turrets/fire.png" alt="Reward Turret" />
+        </div>
+        <h3 id="reward-turret-name" class="reward-turret-name">FIRE TURRET</h3>
+        <p id="reward-turret-ability" class="reward-turret-ability">Applies incendiary burn over time to normal hostile targets.</p>
+        <div id="reward-duplicate-notice" class="duplicate-notice hidden">
+          <i class="fa-solid fa-coins"></i> DUPLICATE: +<span id="reward-fragment-amount">10</span> FRAGMENTS
+        </div>
+        <div class="reward-actions">
+          <button type="button" id="btn-reward-equip" class="btn btn-primary" style="padding: 10px 24px; font-weight: 850;">
+            <i class="fa-solid fa-check"></i> EQUIP NOW
+          </button>
+          <button type="button" id="btn-reward-again" class="btn" style="background: rgba(255, 190, 26, 0.2); border-color: rgba(255, 190, 26, 0.4); color: #ffbe1a;">
+            <i class="fa-solid fa-key"></i> OPEN ANOTHER
+          </button>
+          <button type="button" id="btn-reward-close" class="btn btn-secondary">
+            CLOSE
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN CONSOLE MODAL -->
+    <section id="admin-screen" class="screen hidden" aria-modal="true" role="dialog">
+      <div class="admin-container modal-frame">
+        <div class="admin-header">
+          <div class="admin-title-wrap">
+            <span class="badge-tag admin-badge">RESTRICTED ACCESS</span>
+            <h2>COMMAND HQ: KEY DISPATCHER</h2>
+          </div>
+          <div class="admin-auth-info">
+            <span class="admin-id-pill" id="admin-user-id-pill">ADMIN: 831164553442230273</span>
+            <button id="close-admin-screen" class="close-modal-btn" type="button" aria-label="Close Admin">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="admin-body">
+          <!-- Left: Gift Form -->
+          <div class="admin-gift-form modal-frame">
+            <div class="form-header">
+              <i class="fa-solid fa-paper-plane"></i>
+              <h3>DISPATCH WEAPON KEYS</h3>
+            </div>
+            <p class="form-desc">Send keys directly to any Discord operative by Snowflake ID. Delivered in real-time if active, or queued until their next login.</p>
+
+            <div class="form-group">
+              <label for="admin-target-id">RECIPIENT DISCORD SNOWFLAKE ID</label>
+              <div class="input-with-icon">
+                <i class="fa-brands fa-discord"></i>
+                <input type="text" id="admin-target-id" class="admin-input" placeholder="e.g. 831164553442230273" autocomplete="off" spellcheck="false" />
+              </div>
+              <span class="field-hint">17–20 digit numeric snowflake or active player username</span>
+            </div>
+
+            <div class="form-group quantity-input-wrap">
+              <label for="admin-key-quantity">KEY QUANTITY TO GRANT</label>
+              <input type="number" id="admin-key-quantity" class="quantity-input admin-input" min="1" max="1000" value="5" />
+              <div class="quick-qty-chips">
+                <button type="button" class="qty-chip" data-qty="1">+1</button>
+                <button type="button" class="qty-chip" data-qty="5">+5</button>
+                <button type="button" class="qty-chip" data-qty="10">+10</button>
+                <button type="button" class="qty-chip" data-qty="25">+25</button>
+                <button type="button" class="qty-chip" data-qty="50">+50</button>
+                <button type="button" class="qty-chip" data-qty="100">+100</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="admin-gift-note">TRANSMISSION NOTE (OPTIONAL)</label>
+              <div class="input-with-icon">
+                <i class="fa-solid fa-comment-dots"></i>
+                <input type="text" id="admin-gift-note" class="admin-input" placeholder="e.g. Combat MVP Requisition" maxlength="60" />
+              </div>
+            </div>
+
+            <button type="button" id="btn-admin-submit-gift" class="btn btn-primary admin-submit-btn">
+              <i class="fa-solid fa-gift"></i> TRANSMIT KEY REQUISITION
+            </button>
+            <div id="admin-feedback-msg" class="admin-feedback-msg hidden"></div>
+          </div>
+
+          <!-- Right: Transaction History -->
+          <div class="admin-history-panel modal-frame">
+            <div class="history-header">
+              <div class="history-title">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <h3>GRANT DISPATCH LOG</h3>
+              </div>
+              <button type="button" id="btn-refresh-admin-history" class="refresh-history-btn" title="Refresh Transaction Log">
+                <i class="fa-solid fa-arrows-rotate"></i>
+              </button>
+            </div>
+            <div class="history-table-wrapper">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>DATE</th>
+                    <th>RECIPIENT</th>
+                    <th>KEYS</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-history-tbody">
+                  <tr><td colspan="4" class="empty-table-msg">Loading transmission records…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REAL-TIME INCOMING GIFT POPUP -->
+    <div id="gift-modal" class="gift-popup-overlay hidden" aria-modal="true" role="dialog">
+      <div class="gift-popup-backdrop"></div>
+      <div class="gift-popup-card">
+        <div class="gift-glowing-chest">
+          <i class="fa-solid fa-box-open crate-icon gift-chest-icon"></i>
+          <span class="gift-key-sparkle">🔑</span>
+        </div>
+        <span class="gift-badge-tag">INCOMING AIRDROP</span>
+        <h3 class="gift-headline">WEAPON KEYS RECEIVED!</h3>
+        <p class="gift-message">
+          Command has granted you <strong id="gift-modal-amount">5</strong> Turret Weapon Keys.<br>
+          <small id="gift-modal-note" style="color: var(--text-muted); display: block; margin-top: 4px;"></small>
+        </p>
+        <div class="gift-popup-actions">
+          <button type="button" id="btn-claim-gift" class="btn claim-gift-btn">
+            <i class="fa-solid fa-check"></i> CLAIM KEYS
+          </button>
+          <button type="button" id="btn-decline-gift" class="btn btn-secondary decline-gift-btn">
+            DECLINE
+          </button>
         </div>
       </div>
     </div>

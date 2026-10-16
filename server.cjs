@@ -4,6 +4,30 @@ const express = require("express"),
   http = require("http");
 const { Server } = require("socket.io");
 const { createScaledMask } = require("./collision-masks.cjs");
+const inventoryStorage = require("./inventoryStorage.cjs");
+const {
+  TURRET_TYPES,
+  COLLECTIBLE_TURRET_IDS,
+  DUPLICATE_FRAGMENTS,
+  FRAGMENTS_PER_KEY,
+  ADMIN_DISCORD_ID,
+} = require("./turretConfig.cjs");
+const { BABY_CYBORG_CONFIG } = require("./babyCyborgConfig.cjs");
+const guestInventories = new Map();
+function getGuestInventory(socketId) {
+  if (!guestInventories.has(socketId)) {
+    guestInventories.set(socketId, {
+      discordId: "guest",
+      keys: 1,
+      fragments: 0,
+      unlockedTurrets: ["default"],
+      equippedTurret: "default",
+      caseHistory: [],
+      isGuest: true,
+    });
+  }
+  return guestInventories.get(socketId);
+}
 const app = express(),
   server = http.createServer(app),
   io = new Server(server);
@@ -232,6 +256,18 @@ function sweptBulletTouchesCircle(bullet, prevX, prevY, cx, cy, cRadius) {
   return Math.hypot(projX - cx, projY - cy) <= combinedR;
 }
 
+function distanceToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  return Math.hypot(px - projX, py - projY);
+}
+
 const hordeGames = new Map();
 
 const HORDE_CARDS = {
@@ -241,7 +277,7 @@ const HORDE_CARDS = {
     category: "ability",
     rarity: "rare",
     name: "Dash Thrusters",
-    desc: "Unlock Spacebar Dash. Burst forward with high-speed thrusters to stun enemies you dash through for 3 seconds.",
+    desc: "Unlock Dash [Spacebar]. Dash forward and stun enemies hit for 3s.",
     icon: "⚡",
     faIcon: "fa-solid fa-bolt-lightning",
     condition: (player, horde) => !player.hasDash,
@@ -252,7 +288,7 @@ const HORDE_CARDS = {
     category: "ability",
     rarity: "rare",
     name: "Tactical Dodge & Deflect",
-    desc: "Unlock Deflect shield [R] and Evasive Dodge roll [SHIFT / F] with full invulnerability frames and projectile deflection.",
+    desc: "Unlock Deflect [R] to reflect enemy bullets and Dodge [Shift / F] with brief invulnerability.",
     icon: "🌀",
     faIcon: "fa-solid fa-wind",
     condition: (player, horde) => !player.hasDodge,
@@ -263,7 +299,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "uncommon",
     name: "Tactical Zoom",
-    desc: "Upgrade targeting optics. Zooms out camera perspective to 1.5x on Tier 1 and 2.0x on Tier 2 to see more of the map (maximum 2 cards).",
+    desc: "Zooms out camera to see more of the map (stacks up to 2x).",
     icon: "🔭",
     faIcon: "fa-solid fa-magnifying-glass-plus",
     condition: (player, horde) => (player.zoomLevel || 0) < 2,
@@ -276,7 +312,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "common",
     name: "Plasma Overcharge",
-    desc: "Overcharge blaster coils: increase kinetic and plasma bullet damage by +20% (stackable).",
+    desc: "+20% bullet damage (stacks).",
     icon: "⚡",
     faIcon: "fa-solid fa-bolt",
     condition: () => true,
@@ -289,7 +325,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "common",
     name: "High-Caliber Ordnance",
-    desc: "Load dense armor-piercing kinetic rounds: increases all bullet damage by +15% (stackable).",
+    desc: "+15% bullet damage (stacks).",
     icon: "💥",
     faIcon: "fa-solid fa-burst",
     condition: () => true,
@@ -302,7 +338,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "uncommon",
     name: "Tungsten Penetrator",
-    desc: "Reinforced tungsten carbide projectile cores: increases bullet damage by +18% (stackable).",
+    desc: "+18% bullet damage (stacks).",
     icon: "🎯",
     faIcon: "fa-solid fa-bullseye",
     condition: () => true,
@@ -315,7 +351,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "rare",
     name: "Hyper-Charge Capacitors",
-    desc: "Supercharged plasma capacitors: delivers lethal energy bursts increasing bullet damage by +25% (stackable).",
+    desc: "+25% bullet damage (stacks).",
     icon: "⚛️",
     faIcon: "fa-solid fa-atom",
     condition: () => true,
@@ -328,7 +364,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "uncommon",
     name: "Hair Trigger",
-    desc: "Upgrade cycling mechanism: accelerates weapon firing rate by 15% (stackable).",
+    desc: "+15% faster firing rate (stacks).",
     icon: "🔫",
     faIcon: "fa-solid fa-gun",
     condition: () => true,
@@ -341,7 +377,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "common",
     name: "Overclocked Actuator",
-    desc: "Overclock mechanical bolt cycling: reduces firing delay by 12% for faster shooting (stackable).",
+    desc: "+12% faster firing rate (stacks).",
     icon: "⚙️",
     faIcon: "fa-solid fa-gauge-high",
     condition: () => true,
@@ -354,7 +390,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "common",
     name: "Lightweight Bolt",
-    desc: "Ultra-light carbon-composite bolt: reduces firing interval by 10% (stackable).",
+    desc: "+10% faster firing rate (stacks).",
     icon: "💨",
     faIcon: "fa-solid fa-forward-fast",
     condition: () => true,
@@ -367,7 +403,7 @@ const HORDE_CARDS = {
     category: "upgrade",
     rarity: "rare",
     name: "Twin-Feed Loader",
-    desc: "Dual-chamber high-speed pneumatic loader: increases firing rate by 20% (stackable).",
+    desc: "+20% faster firing rate (stacks).",
     icon: "🔁",
     faIcon: "fa-solid fa-arrows-spin",
     condition: () => true,
@@ -382,7 +418,7 @@ const HORDE_CARDS = {
     category: "utility",
     rarity: "common",
     name: "Granny Defense Cannon",
-    desc: "Granny statue auto-fires plasma bolts (1.8s reload, 720px range). Stacking accelerates fire rate down to 0.65s.",
+    desc: "Granny statue auto-shoots nearby enemies. Stacks for faster fire rate.",
     icon: "🔱",
     faIcon: "fa-solid fa-crosshairs",
     condition: (player, horde) => true,
@@ -394,8 +430,8 @@ const HORDE_CARDS = {
     id: "repair_all_structures",
     category: "upgrade",
     rarity: "rare",
-    name: "Nanite Field Restoration",
-    desc: "Deploy an emergency nanite pulse instantly restoring all deployed barricades, sentries, and traps to 100% full health (excludes Granny Core).",
+    name: "Repair All Structures",
+    desc: "Instantly repairs all placed barricades, sentries, and traps to 100% HP.",
     icon: "🔧",
     faIcon: "fa-solid fa-wrench",
     condition: (player, horde) => (horde.placedObjects || []).some(o => o.hp < o.maxHp),
@@ -417,8 +453,8 @@ const HORDE_CARDS = {
     id: "granny_repair",
     category: "utility",
     rarity: "common",
-    name: "Core Nanite Repair",
-    desc: "Instantly restore the Granny Core back to 100% full health.",
+    name: "Core Repair",
+    desc: "Instantly restores Granny Core to 100% HP.",
     icon: "🔧",
     faIcon: "fa-solid fa-screwdriver-wrench",
     condition: (player, horde) => horde.baseHealth < horde.maxBaseHealth,
@@ -430,8 +466,8 @@ const HORDE_CARDS = {
     id: "granny_heal_aura",
     category: "utility",
     rarity: "uncommon",
-    name: "Bio-Regen Field",
-    desc: "Emits a protective rejuvenation ring around Granny that heals nearby players. Stacking increases rate and range.",
+    name: "Healing Aura",
+    desc: "Heals players standing near Granny. Stacking increases heal amount and range.",
     icon: "💚",
     faIcon: "fa-solid fa-heart-pulse",
     condition: (player, horde) => true,
@@ -446,7 +482,7 @@ const HORDE_CARDS = {
     category: "object",
     rarity: "common",
     name: "Barricade",
-    desc: "Deploy a sturdy defensive barricade that blocks enemy pathing and absorbs hostile melee attacks.",
+    desc: "Deploy a barricade to block enemies and absorb damage.",
     icon: "🛡️",
     faIcon: "fa-solid fa-shield-halved",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "wall" || o.type === "barricade").length < 12,
@@ -459,8 +495,8 @@ const HORDE_CARDS = {
     id: "object_turret",
     category: "object",
     rarity: "uncommon",
-    name: "Autonomous Sentry",
-    desc: "Deploy an automated sentry gun station that fires at approaching enemies within its radius.",
+    name: "Sentry Turret",
+    desc: "Deploy an automated turret that shoots nearby enemies.",
     icon: "📡",
     faIcon: "fa-solid fa-tower-broadcast",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "turret").length < 6,
@@ -473,8 +509,8 @@ const HORDE_CARDS = {
     id: "object_trap",
     category: "object",
     rarity: "uncommon",
-    name: "Cryo Freeze Trap",
-    desc: "Deploy a cryo floor trap. When triggered, it creates a 5-second sub-zero freeze zone that freezes every enemy who enters or touches it.",
+    name: "Freeze Trap",
+    desc: "Deploy a trap that freezes enemies in the area for 5s when triggered.",
     icon: "❄️",
     faIcon: "fa-solid fa-snowflake",
     condition: (player, horde) => horde.placedObjects.filter(o => o.type === "trap").length < 6,
@@ -489,8 +525,8 @@ const HORDE_CARDS = {
     id: "turret_range",
     category: "upgrade",
     rarity: "common",
-    name: "Turret Radar Optics",
-    desc: "Upgrade all sentry turrets with +70px targeting and firing range.",
+    name: "Turret Range",
+    desc: "+70px range for all sentry turrets.",
     icon: "🔭",
     faIcon: "fa-solid fa-satellite-dish",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
@@ -502,8 +538,8 @@ const HORDE_CARDS = {
     id: "turret_cooldown",
     category: "upgrade",
     rarity: "common",
-    name: "Turret Overclock",
-    desc: "Accelerate turret barrel cycling: reduce firing cooldown by 25%.",
+    name: "Turret Fire Rate",
+    desc: "All sentry turrets shoot 25% faster.",
     icon: "⚙️",
     faIcon: "fa-solid fa-gauge-high",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
@@ -515,8 +551,8 @@ const HORDE_CARDS = {
     id: "turret_damage",
     category: "upgrade",
     rarity: "common",
-    name: "High-Caliber Rounds",
-    desc: "Increase all sentry turret bullet damage by +1.2 per shot.",
+    name: "Turret Damage",
+    desc: "+1.2 bullet damage for all sentry turrets.",
     icon: "💥",
     faIcon: "fa-solid fa-burst",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "turret"),
@@ -528,8 +564,8 @@ const HORDE_CARDS = {
     id: "trap_cooldown",
     category: "upgrade",
     rarity: "common",
-    name: "Rapid Cryo Cycling",
-    desc: "Reduce trap recovery time after freeze from 5.0s down to 3.2s (or faster).",
+    name: "Trap Cooldown",
+    desc: "Reduces trap re-arm cooldown by 1.3s.",
     icon: "⏱️",
     faIcon: "fa-solid fa-clock-rotate-left",
     condition: (player, horde) => horde.placedObjects.some(o => o.type === "trap"),
@@ -573,6 +609,8 @@ class HordeGame {
     // Boss Fight State
     this.boss = null;
     this.isBossWave = false;
+    this.pendingBossSpawnAt = null;
+    this.pendingBossType = null;
 
     // Upgrade Selection State
     this.pendingPlayersToChoose = new Set();
@@ -832,6 +870,10 @@ class HordeGame {
 
   updateBoss(dt, wallNow, roomPlayerIds, bullets, io) {
     if (!this.boss || this.boss.phase === "defeated") return;
+    if (this.boss.id === "boss_baby_cyborg") {
+      this.updateBabyCyborg(dt, wallNow, roomPlayerIds, bullets, io);
+      return;
+    }
 
     const activePlayers = [...roomPlayerIds]
       .map(id => players.get(id))
@@ -1199,6 +1241,496 @@ class HordeGame {
     this.boss.y = clamped.y;
   }
 
+  spawnBabyCyborg(activeCount, io) {
+    const wallNow = Date.now();
+    const spawnSide = Math.random() < 0.5 ? "left" : "right";
+    const spawnX = spawnSide === "left" ? ARENA_CENTER.x - 1000 : ARENA_CENTER.x + 1000;
+    const spawnY = ARENA_CENTER.y;
+    const maxHp = BABY_CYBORG_CONFIG.baseHp + Math.max(0, activeCount - 1) * BABY_CYBORG_CONFIG.hpPerExtraPlayer;
+
+    this.boss = {
+      id: BABY_CYBORG_CONFIG.id,
+      name: BABY_CYBORG_CONFIG.name,
+      spawnSide,
+      x: spawnX,
+      y: spawnY,
+      vx: 0,
+      vy: 0,
+      facing: 1,
+      radius: BABY_CYBORG_CONFIG.radius,
+      renderSize: BABY_CYBORG_CONFIG.renderSize,
+      hp: maxHp,
+      maxHp: maxHp,
+      phase: "intro", // "intro" | "phase1" | "phase2" | "phase3_cloning" | "phase3" | "defeated"
+      isInvincible: true,
+      introUntil: wallNow + 2500,
+      animState: "walk",
+      lastAttackAt: wallNow + 3500,
+      attackType: "laser",
+      lastPlayerDamageAt: 0,
+
+      // Laser state
+      laserState: "idle", // "idle" | "warning" | "firing"
+      laserTarget: null,
+      laserStartAt: 0,
+      laserEndAt: 0,
+
+      // Stomp state
+      stompState: "idle", // "idle" | "warning" | "landing"
+      stompTarget: null,
+      stompWarnUntil: 0,
+      stompLandUntil: 0,
+      stompRadius: BABY_CYBORG_CONFIG.stomp.radius,
+      stompDamage: BABY_CYBORG_CONFIG.stomp.damage,
+
+      // Phase 3 Clones state
+      transformationUntil: 0,
+      clones: [],
+    };
+
+    io.to(this.room).emit("boss_spawned", {
+      boss: {
+        id: this.boss.id,
+        name: this.boss.name,
+        spawnSide: this.boss.spawnSide,
+        x: this.boss.x,
+        y: this.boss.y,
+        hp: this.boss.hp,
+        maxHp: this.boss.maxHp,
+        phase: this.boss.phase,
+        introUntil: this.boss.introUntil,
+      }
+    });
+  }
+
+  updateBabyCyborg(dt, wallNow, roomPlayerIds, bullets, io) {
+    if (!this.boss || this.boss.phase === "defeated") return;
+
+    const activePlayers = [...roomPlayerIds]
+      .map(id => players.get(id))
+      .filter(p => p && p.active && p.health > 0);
+
+    const findClosestTarget = (fromX, fromY) => {
+      const targetablePlayers = activePlayers.filter(p => !p.protectedUntil || p.protectedUntil <= wallNow);
+      if (targetablePlayers.length > 0) {
+        let closestPlayer = null;
+        let closestDist = Infinity;
+        for (const p of targetablePlayers) {
+          const d = Math.hypot(fromX - p.x, fromY - p.y);
+          if (d < closestDist) {
+            closestDist = d;
+            closestPlayer = p;
+          }
+        }
+        if (closestPlayer) {
+          return { x: closestPlayer.x, y: closestPlayer.y, isBase: false, player: closestPlayer };
+        }
+      }
+      return { x: ARENA_CENTER.x, y: ARENA_CENTER.y, isBase: true };
+    };
+
+    const getEntityEyes = (entity, renderWidth, renderHeight) => {
+      const leftX = entity.x + (BABY_CYBORG_CONFIG.leftEye.normX - 0.5) * renderWidth;
+      const leftY = entity.y + (BABY_CYBORG_CONFIG.leftEye.normY - 0.5) * renderHeight;
+      const rightX = entity.x + (BABY_CYBORG_CONFIG.rightEye.normX - 0.5) * renderWidth;
+      const rightY = entity.y + (BABY_CYBORG_CONFIG.rightEye.normY - 0.5) * renderHeight;
+      return { left: { x: leftX, y: leftY }, right: { x: rightX, y: rightY } };
+    };
+
+    const applyLaserBeamDamage = (eyeX, eyeY, targetX, targetY, dps) => {
+      const angle = Math.atan2(targetY - eyeY, targetX - eyeX);
+      const range = BABY_CYBORG_CONFIG.laser.range;
+      const endX = eyeX + Math.cos(angle) * range;
+      const endY = eyeY + Math.sin(angle) * range;
+      const dmg = dps * dt;
+      const beamRadius = 14;
+
+      for (const p of activePlayers) {
+        if (p.protectedUntil && p.protectedUntil > wallNow) continue;
+        const pRadius = characterRadius(p.character);
+        if (distanceToSegment(p.x, p.y, eyeX, eyeY, endX, endY) <= pRadius + beamRadius) {
+          p.health = Math.max(0, p.health - dmg);
+          p.lastDamageAt = wallNow;
+          io.to(p.id).emit("damage_taken", { health: p.health, damage: dmg, source: "baby_laser" });
+        }
+      }
+
+      if (distanceToSegment(ARENA_CENTER.x, ARENA_CENTER.y, eyeX, eyeY, endX, endY) <= 50 + beamRadius) {
+        this.baseHealth = Math.max(0, this.baseHealth - dmg * 0.35);
+      }
+
+      for (const obj of this.placedObjects) {
+        if (distanceToSegment(obj.x, obj.y, eyeX, eyeY, endX, endY) <= (obj.radius || 24) + beamRadius) {
+          obj.hp = Math.max(0, obj.hp - dmg * 0.6);
+        }
+      }
+    };
+
+    const executeStompImpact = (targetX, targetY, radius, damage) => {
+      for (const p of activePlayers) {
+        if (p.protectedUntil && p.protectedUntil > wallNow) continue;
+        const d = Math.hypot(p.x - targetX, p.y - targetY);
+        if (d <= radius) {
+          const isDodging = wallNow < (p.dodgeUntil || 0);
+          if (!isDodging) {
+            p.health = Math.max(0, p.health - damage);
+            p.lastDamageAt = wallNow;
+            io.to(p.id).emit("damage_taken", { health: p.health, damage, source: "baby_stomp" });
+          }
+        }
+      }
+
+      if (Math.hypot(ARENA_CENTER.x - targetX, ARENA_CENTER.y - targetY) <= radius) {
+        this.baseHealth = Math.max(0, this.baseHealth - Math.round(damage * 0.18));
+      }
+
+      for (const obj of this.placedObjects) {
+        const d = Math.hypot(obj.x - targetX, obj.y - targetY);
+        if (d <= radius) {
+          obj.hp = Math.max(0, obj.hp - damage * 0.5);
+        }
+      }
+
+      io.to(this.room).emit("baby_stomp_landed", {
+        x: targetX,
+        y: targetY,
+        radius: radius,
+      });
+    };
+
+    // 1. Intro Walk-in
+    if (this.boss.phase === "intro") {
+      this.boss.animState = "walk";
+      const targetX = this.boss.spawnSide === "left" ? ARENA_CENTER.x - 450 : ARENA_CENTER.x + 450;
+      const dir = targetX > this.boss.x ? 1 : -1;
+      this.boss.x += dir * BABY_CYBORG_CONFIG.speed * dt;
+      if (wallNow >= this.boss.introUntil) {
+        this.boss.phase = "phase1";
+        this.boss.isInvincible = false;
+        this.boss.animState = "idle";
+        this.boss.lastAttackAt = wallNow + 1200;
+        io.to(this.room).emit("boss_intro_finished", { bossId: this.boss.id });
+      }
+      return;
+    }
+
+    // 2. Phase Transitions
+    if (this.boss.phase === "phase1" && this.boss.hp <= this.boss.maxHp * BABY_CYBORG_CONFIG.phaseThresholds.phase2) {
+      this.boss.phase = "phase2";
+      this.boss.laserState = "idle";
+      this.boss.stompState = "idle";
+      this.boss.lastAttackAt = wallNow + 1000;
+      this.boss.attackType = "stomp";
+      io.to(this.room).emit("boss_phase_changed", {
+        bossId: this.boss.id,
+        phase: "phase2",
+        subtitle: "BABY TANTRUM",
+        hp: this.boss.hp,
+      });
+    }
+
+    if ((this.boss.phase === "phase1" || this.boss.phase === "phase2") && this.boss.hp <= this.boss.maxHp * BABY_CYBORG_CONFIG.phaseThresholds.phase3) {
+      this.boss.phase = "phase3_cloning";
+      this.boss.isInvincible = true;
+      this.boss.laserState = "idle";
+      this.boss.stompState = "idle";
+      this.boss.transformationUntil = wallNow + BABY_CYBORG_CONFIG.transformationDuration;
+      io.to(this.room).emit("boss_phase_changed", {
+        bossId: this.boss.id,
+        phase: "phase3_cloning",
+        subtitle: "CLONE PROTOCOL",
+        hp: this.boss.hp,
+        transformationUntil: this.boss.transformationUntil,
+      });
+      return;
+    }
+
+    // 3. Phase 3 Cloning Transformation
+    if (this.boss.phase === "phase3_cloning") {
+      this.boss.animState = "idle";
+      if (wallNow >= this.boss.transformationUntil) {
+        this.boss.phase = "phase3";
+        this.boss.isInvincible = false;
+        const remainingHp = Math.max(300, this.boss.hp);
+        const cloneHp = Math.round(remainingHp / 3);
+
+        this.boss.clones = [
+          {
+            id: "clone_0",
+            x: this.boss.x,
+            y: this.boss.y,
+            vx: 0,
+            vy: 0,
+            radius: BABY_CYBORG_CONFIG.cloneRadius,
+            renderSize: BABY_CYBORG_CONFIG.cloneRenderSize,
+            hp: cloneHp,
+            maxHp: cloneHp,
+            alive: true,
+            animState: "walk",
+            facing: 1,
+            nextAttackAt: wallNow + 1000,
+            attackType: "laser",
+            laserState: "idle",
+            laserTarget: null,
+            laserStartAt: 0,
+            laserEndAt: 0,
+            stompState: "idle",
+            stompTarget: null,
+            stompWarnUntil: 0,
+            stompLandUntil: 0,
+            stompRadius: 110,
+            stompDamage: 125,
+          },
+          {
+            id: "clone_1",
+            x: this.boss.x - 85,
+            y: this.boss.y - 45,
+            vx: 0,
+            vy: 0,
+            radius: BABY_CYBORG_CONFIG.cloneRadius,
+            renderSize: BABY_CYBORG_CONFIG.cloneRenderSize,
+            hp: cloneHp,
+            maxHp: cloneHp,
+            alive: true,
+            animState: "walk",
+            facing: 1,
+            nextAttackAt: wallNow + 3400,
+            attackType: "stomp",
+            laserState: "idle",
+            laserTarget: null,
+            laserStartAt: 0,
+            laserEndAt: 0,
+            stompState: "idle",
+            stompTarget: null,
+            stompWarnUntil: 0,
+            stompLandUntil: 0,
+            stompRadius: 110,
+            stompDamage: 125,
+          },
+          {
+            id: "clone_2",
+            x: this.boss.x + 85,
+            y: this.boss.y + 45,
+            vx: 0,
+            vy: 0,
+            radius: BABY_CYBORG_CONFIG.cloneRadius,
+            renderSize: BABY_CYBORG_CONFIG.cloneRenderSize,
+            hp: cloneHp,
+            maxHp: cloneHp,
+            alive: true,
+            animState: "walk",
+            facing: 1,
+            nextAttackAt: wallNow + 5800,
+            attackType: "laser",
+            laserState: "idle",
+            laserTarget: null,
+            laserStartAt: 0,
+            laserEndAt: 0,
+            stompState: "idle",
+            stompTarget: null,
+            stompWarnUntil: 0,
+            stompLandUntil: 0,
+            stompRadius: 110,
+            stompDamage: 125,
+          },
+        ];
+
+        io.to(this.room).emit("boss_clones_spawned", { clones: this.boss.clones });
+      }
+      return;
+    }
+
+    // 4. Phase 1 & Phase 2 Loop
+    if (this.boss.phase === "phase1" || this.boss.phase === "phase2") {
+      if (this.boss.laserState === "warning") {
+        this.boss.animState = "idle";
+        if (wallNow >= this.boss.laserStartAt) {
+          this.boss.laserState = "firing";
+        }
+      } else if (this.boss.laserState === "firing") {
+        this.boss.animState = "idle";
+        const eyes = getEntityEyes(this.boss, this.boss.renderSize, this.boss.renderSize);
+        applyLaserBeamDamage(eyes.left.x, eyes.left.y, this.boss.laserTarget.x, this.boss.laserTarget.y, BABY_CYBORG_CONFIG.laser.dpsPerBeam);
+        applyLaserBeamDamage(eyes.right.x, eyes.right.y, this.boss.laserTarget.x, this.boss.laserTarget.y, BABY_CYBORG_CONFIG.laser.dpsPerBeam);
+        if (wallNow >= this.boss.laserEndAt) {
+          this.boss.laserState = "idle";
+          this.boss.lastAttackAt = wallNow + BABY_CYBORG_CONFIG.laser.cooldown;
+          this.boss.attackType = "stomp";
+        }
+      } else if (this.boss.stompState === "warning") {
+        this.boss.animState = "stomp";
+        if (wallNow >= this.boss.stompWarnUntil) {
+          this.boss.stompState = "landing";
+        }
+      } else if (this.boss.stompState === "landing") {
+        if (wallNow >= this.boss.stompLandUntil) {
+          executeStompImpact(this.boss.stompTarget.x, this.boss.stompTarget.y, this.boss.stompRadius, this.boss.stompDamage);
+          this.boss.stompState = "idle";
+          this.boss.lastAttackAt = wallNow + BABY_CYBORG_CONFIG.stomp.cooldown;
+          this.boss.attackType = "laser";
+        }
+      } else {
+        // Ready for next attack
+        if (wallNow >= this.boss.lastAttackAt) {
+          const ability = (this.boss.phase === "phase2" && this.boss.attackType === "stomp") ? "stomp" : "laser";
+          const target = findClosestTarget(this.boss.x, this.boss.y);
+
+          if (ability === "laser") {
+            this.boss.laserState = "warning";
+            this.boss.laserTarget = { x: target.x, y: target.y };
+            this.boss.laserStartAt = wallNow + BABY_CYBORG_CONFIG.laser.warningDuration;
+            this.boss.laserEndAt = this.boss.laserStartAt + BABY_CYBORG_CONFIG.laser.firingDuration;
+            io.to(this.room).emit("baby_laser_warning", {
+              bossId: this.boss.id,
+              target: this.boss.laserTarget,
+              duration: BABY_CYBORG_CONFIG.laser.warningDuration,
+            });
+          } else {
+            this.boss.stompState = "warning";
+            this.boss.stompTarget = { x: target.x, y: target.y };
+            this.boss.stompWarnUntil = wallNow + BABY_CYBORG_CONFIG.stomp.warningDuration;
+            this.boss.stompLandUntil = this.boss.stompWarnUntil + 400;
+            io.to(this.room).emit("baby_stomp_warning", {
+              bossId: this.boss.id,
+              target: this.boss.stompTarget,
+              radius: this.boss.stompRadius,
+              duration: BABY_CYBORG_CONFIG.stomp.warningDuration,
+            });
+          }
+        } else {
+          // General movement towards arena center / closest target
+          const target = findClosestTarget(this.boss.x, this.boss.y);
+          const dx = target.x - this.boss.x;
+          const dy = target.y - this.boss.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 90) {
+            this.boss.vx = (dx / dist) * BABY_CYBORG_CONFIG.speed;
+            this.boss.vy = (dy / dist) * BABY_CYBORG_CONFIG.speed;
+            this.boss.x += this.boss.vx * dt;
+            this.boss.y += this.boss.vy * dt;
+            this.boss.animState = "walk";
+          } else {
+            this.boss.animState = "idle";
+          }
+          const clamped = clampToArena(this.boss.x, this.boss.y, this.boss.radius);
+          this.boss.x = clamped.x;
+          this.boss.y = clamped.y;
+        }
+      }
+
+      // Contact crushing damage
+      for (const p of activePlayers) {
+        if (p.protectedUntil && p.protectedUntil > wallNow) continue;
+        const pDist = Math.hypot(p.x - this.boss.x, p.y - this.boss.y);
+        const pRadius = characterRadius(p.character);
+        if (pDist <= this.boss.radius + pRadius) {
+          if (wallNow - (this.boss.lastPlayerDamageAt || 0) >= 800) {
+            this.boss.lastPlayerDamageAt = wallNow;
+            const contactDmg = 4.0;
+            p.health = Math.max(0, p.health - contactDmg);
+            p.lastDamageAt = wallNow;
+            io.to(p.id).emit("damage_taken", { health: p.health, damage: contactDmg, source: "boss_contact" });
+          }
+        }
+      }
+      return;
+    }
+
+    // 5. Phase 3: Independent Clone Loop
+    if (this.boss.phase === "phase3") {
+      let aliveCount = 0;
+      let totalCloneHp = 0;
+
+      for (const clone of this.boss.clones) {
+        if (!clone.alive || clone.hp <= 0) continue;
+        aliveCount++;
+        totalCloneHp += clone.hp;
+
+        const target = findClosestTarget(clone.x, clone.y);
+
+        if (clone.laserState === "warning") {
+          clone.animState = "idle";
+          if (wallNow >= clone.laserStartAt) {
+            clone.laserState = "firing";
+          }
+        } else if (clone.laserState === "firing") {
+          clone.animState = "idle";
+          const eyes = getEntityEyes(clone, clone.renderSize, clone.renderSize);
+          applyLaserBeamDamage(eyes.left.x, eyes.left.y, clone.laserTarget.x, clone.laserTarget.y, BABY_CYBORG_CONFIG.laser.dpsPerBeam);
+          applyLaserBeamDamage(eyes.right.x, eyes.right.y, clone.laserTarget.x, clone.laserTarget.y, BABY_CYBORG_CONFIG.laser.dpsPerBeam);
+          if (wallNow >= clone.laserEndAt) {
+            clone.laserState = "idle";
+            clone.nextAttackAt = wallNow + BABY_CYBORG_CONFIG.laser.cooldown + Math.random() * 2000;
+            clone.attackType = "stomp";
+          }
+        } else if (clone.stompState === "warning") {
+          clone.animState = "stomp";
+          if (wallNow >= clone.stompWarnUntil) {
+            clone.stompState = "landing";
+          }
+        } else if (clone.stompState === "landing") {
+          if (wallNow >= clone.stompLandUntil) {
+            executeStompImpact(clone.stompTarget.x, clone.stompTarget.y, clone.stompRadius, clone.stompDamage);
+            clone.stompState = "idle";
+            clone.nextAttackAt = wallNow + BABY_CYBORG_CONFIG.stomp.cooldown + Math.random() * 2000;
+            clone.attackType = "laser";
+          }
+        } else {
+          // Ready for attack
+          if (wallNow >= clone.nextAttackAt) {
+            if (clone.attackType === "laser") {
+              clone.laserState = "warning";
+              clone.laserTarget = { x: target.x, y: target.y };
+              clone.laserStartAt = wallNow + BABY_CYBORG_CONFIG.laser.warningDuration;
+              clone.laserEndAt = clone.laserStartAt + BABY_CYBORG_CONFIG.laser.firingDuration;
+              io.to(this.room).emit("baby_laser_warning", {
+                bossId: clone.id,
+                target: clone.laserTarget,
+                duration: BABY_CYBORG_CONFIG.laser.warningDuration,
+              });
+            } else {
+              clone.stompState = "warning";
+              clone.stompTarget = { x: target.x, y: target.y };
+              clone.stompWarnUntil = wallNow + BABY_CYBORG_CONFIG.stomp.warningDuration;
+              clone.stompLandUntil = clone.stompWarnUntil + 400;
+              io.to(this.room).emit("baby_stomp_warning", {
+                bossId: clone.id,
+                target: clone.stompTarget,
+                radius: clone.stompRadius,
+                duration: BABY_CYBORG_CONFIG.stomp.warningDuration,
+              });
+            }
+          } else {
+            // Move toward target
+            const dx = target.x - clone.x;
+            const dy = target.y - clone.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 70) {
+              clone.vx = (dx / dist) * BABY_CYBORG_CONFIG.cloneSpeed;
+              clone.vy = (dy / dist) * BABY_CYBORG_CONFIG.cloneSpeed;
+              clone.x += clone.vx * dt;
+              clone.y += clone.vy * dt;
+              clone.animState = "walk";
+            } else {
+              clone.animState = "idle";
+            }
+            const clamped = clampToArena(clone.x, clone.y, clone.radius);
+            clone.x = clamped.x;
+            clone.y = clamped.y;
+          }
+        }
+      }
+
+      this.boss.hp = totalCloneHp;
+
+      if (aliveCount === 0) {
+        this.boss.phase = "defeated";
+        this.boss.animState = "idle";
+        io.to(this.room).emit("boss_defeated", { bossId: this.boss.id });
+      }
+    }
+  }
+
   generateCardOptions(player) {
     const available = [];
     const seenCardIds = new Set();
@@ -1321,23 +1853,45 @@ class HordeGame {
       if (maxMinDist >= minSpacing) break;
     }
 
+    let turretType = "default";
+    let baseRadius = type === "barricade" ? 30 : (type === "turret" ? 22 : 60);
+    let baseHp = type === "barricade" ? 60 : (type === "turret" ? 28 : 100);
+    let baseRange = 240;
+    let baseCooldown = 750;
+    let baseDamage = 2.2;
+
+    if (type === "turret") {
+      const pInv = player?.discordId ? inventoryStorage.getInventory(player.discordId) : null;
+      turretType = pInv?.equippedTurret || player?.equippedTurret || "default";
+      const cfg = TURRET_TYPES[turretType] || TURRET_TYPES.default;
+      baseHp = Math.round(28 * (cfg.healthMultiplier || 1.0));
+      baseRadius = Math.round(22 * (cfg.sizeMultiplier || 1.0));
+      baseRange = Math.round(240 * (cfg.rangeMultiplier || 1.0));
+      baseCooldown = Math.round(750 * (cfg.cooldownMultiplier || 1.0));
+      baseDamage = Math.round(2.2 * (cfg.damageMultiplier || 1.0) * 10) / 10;
+    }
+
     const newObj = {
       id: this.nextObjectId++,
       type,
+      turretType: type === "turret" ? turretType : undefined,
       ownerId: player ? player.id : "system",
       x: Math.round(bestX),
       y: Math.round(bestY),
-      radius: type === "barricade" ? 30 : (type === "turret" ? 22 : 60),
-      hp: type === "barricade" ? 60 : (type === "turret" ? 28 : 100),
-      maxHp: type === "barricade" ? 60 : (type === "turret" ? 28 : 100),
+      radius: baseRadius,
+      hp: baseHp,
+      maxHp: baseHp,
       angle: Number.isFinite(bestAngle) ? bestAngle : 0,
       state: "ready",
       lastShotAt: 0,
-      baseRange: 240,
-      baseCooldown: 750,
-      baseDamage: 2.2,
+      baseRange,
+      baseCooldown,
+      baseDamage,
       frozenUntil: 0,
       recoveryUntil: 0,
+      burstRemaining: 0,
+      nextBurstShotAt: 0,
+      burstIndex: 0,
     };
 
     this.placedObjects.push(newObj);
@@ -1411,15 +1965,28 @@ class HordeGame {
     this.waveState = "active";
     const activeCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
     this.enemiesSpawnedThisWave = 0;
-    this.isBossWave = this.wave === 10;
+    this.isBossWave = (this.wave === 10 || this.wave === 20);
     if (this.isBossWave) {
       this.enemiesToSpawnThisWave = 0;
-      this.spawnBoss(activeCount, io);
-      io.to(this.room).emit("wave_started", {
-        wave: this.wave,
-        totalEnemies: 1,
-        isBossWave: true,
-      });
+      if (this.wave === 20) {
+        io.to(this.room).emit("boss_music_intro", { bossId: "boss_baby_cyborg" });
+        this.pendingBossSpawnAt = Date.now() + 2000;
+        this.pendingBossType = "baby_cyborg";
+        io.to(this.room).emit("wave_started", {
+          wave: this.wave,
+          totalEnemies: 1,
+          isBossWave: true,
+          bossType: "baby_cyborg",
+        });
+      } else {
+        this.spawnBoss(activeCount, io);
+        io.to(this.room).emit("wave_started", {
+          wave: this.wave,
+          totalEnemies: 1,
+          isBossWave: true,
+          bossType: "tung",
+        });
+      }
     } else {
       this.boss = null;
       this.enemiesToSpawnThisWave = this.getWaveEnemyCount(this.wave, activeCount);
@@ -1435,6 +2002,13 @@ class HordeGame {
 
   update(dt, wallNow, roomPlayerIds, bullets, io) {
     const activePlayerCount = Math.max(1, [...roomPlayerIds].filter(id => players.get(id)?.active).length);
+
+    if (this.pendingBossSpawnAt && wallNow >= this.pendingBossSpawnAt) {
+      this.pendingBossSpawnAt = null;
+      if (this.pendingBossType === "baby_cyborg") {
+        this.spawnBabyCyborg(activePlayerCount, io);
+      }
+    }
 
     if (this.waveState === "active") {
       const maxAlive = Math.min(25, 4 + this.wave * 2 + activePlayerCount * 2);
@@ -1463,6 +2037,7 @@ class HordeGame {
         let closestEnemy = null;
         let closestDist = 720;
         for (const enemy of this.enemies) {
+          if (!enemy) continue;
           const d = Math.hypot(enemy.x - ARENA_CENTER.x, enemy.y - ARENA_CENTER.y);
           if (d < closestDist) {
             closestDist = d;
@@ -1470,7 +2045,16 @@ class HordeGame {
           }
         }
         if (this.boss && this.boss.phase !== "intro" && this.boss.phase !== "defeated") {
-          if (Array.isArray(this.boss.spirals) && this.boss.spirals.length > 0) {
+          if (this.boss.id === "boss_baby_cyborg" && this.boss.phase === "phase3" && Array.isArray(this.boss.clones)) {
+            for (const clone of this.boss.clones) {
+              if (!clone.alive || clone.hp <= 0) continue;
+              const d = Math.hypot(clone.x - ARENA_CENTER.x, clone.y - ARENA_CENTER.y);
+              if (d < closestDist) {
+                closestDist = d;
+                closestEnemy = clone;
+              }
+            }
+          } else if (Array.isArray(this.boss.spirals) && this.boss.spirals.length > 0) {
             for (const spiral of this.boss.spirals) {
               const d = Math.hypot(spiral.x - ARENA_CENTER.x, spiral.y - ARENA_CENTER.y);
               if (d < closestDist) {
@@ -1543,79 +2127,141 @@ class HordeGame {
     // 3. Placed Turrets automated firing
     for (const obj of this.placedObjects) {
       if (obj.type !== "turret" || obj.hp <= 0) continue;
+      const tType = obj.turretType || "default";
+      const config = TURRET_TYPES[tType] || TURRET_TYPES.default;
       const cooldown = Math.max(300, (obj.baseCooldown || 750) * (this.turretCooldownMult || 1.0));
-      if (wallNow - (obj.lastShotAt || 0) >= cooldown && this.waveState === "active") {
-        const range = (obj.baseRange || 240) + (this.turretRangeBoost || 0);
-        let closestEnemy = null;
-        let closestDist = range;
+      const range = (obj.baseRange || 240) + (this.turretRangeBoost || 0);
 
+      const findClosestTarget = () => {
+        let closest = null;
+        let cDist = range;
         for (const enemy of this.enemies) {
+          if (!enemy) continue;
           const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
-          if (d < closestDist) {
-            closestDist = d;
-            closestEnemy = enemy;
-          }
+          if (d < cDist) { cDist = d; closest = enemy; }
         }
-
         if (this.boss && this.boss.phase !== "intro" && this.boss.phase !== "defeated") {
-          if (Array.isArray(this.boss.spirals) && this.boss.spirals.length > 0) {
+          if (this.boss.id === "boss_baby_cyborg" && this.boss.phase === "phase3" && Array.isArray(this.boss.clones)) {
+            for (const clone of this.boss.clones) {
+              if (!clone.alive || clone.hp <= 0) continue;
+              const d = Math.hypot(clone.x - obj.x, clone.y - obj.y);
+              if (d < cDist) { cDist = d; closest = clone; }
+            }
+          } else if (Array.isArray(this.boss.spirals) && this.boss.spirals.length > 0) {
             for (const spiral of this.boss.spirals) {
               const d = Math.hypot(spiral.x - obj.x, spiral.y - obj.y);
-              if (d < closestDist) {
-                closestDist = d;
-                closestEnemy = spiral;
-              }
+              if (d < cDist) { cDist = d; closest = spiral; }
             }
           } else if (!this.boss.isInvincible && this.boss.stompState !== "airborne") {
             const d = Math.hypot(this.boss.x - obj.x, this.boss.y - obj.y);
-            if (d < closestDist) {
-              closestDist = d;
-              closestEnemy = this.boss;
-            }
+            if (d < cDist) { cDist = d; closest = this.boss; }
           }
         }
+        return closest;
+      };
 
-        if (closestEnemy) {
-          obj.lastShotAt = wallNow;
-          const angle = Math.atan2(closestEnemy.y - obj.y, closestEnemy.x - obj.x);
+      // Handle ongoing burst shots for burst turrets (double_barrel, tripple_barrel)
+      if (obj.burstRemaining > 0 && wallNow >= (obj.nextBurstShotAt || 0) && this.waveState === "active") {
+        const target = findClosestTarget();
+        if (target) {
+          const angle = Math.atan2(target.y - obj.y, target.x - obj.x);
           obj.angle = angle;
+          const barrelIdx = obj.burstIndex || 0;
+          const lateralOffset = (config.barrelOffsets && config.barrelOffsets[barrelIdx]) || 0;
+          const forwardDist = obj.radius + 6;
+          const bx = obj.x + Math.cos(angle) * forwardDist - Math.sin(angle) * lateralOffset;
+          const by = obj.y + Math.sin(angle) * forwardDist + Math.cos(angle) * lateralOffset;
           const bulletDamage = (obj.baseDamage || 2.2) + (this.turretDamageBoost || 0);
+
           bullets.push({
             id: nextBulletId++,
             room: this.room,
             ownerId: "turret_" + obj.id,
-            x: obj.x + Math.cos(angle) * (obj.radius + 6),
-            y: obj.y + Math.sin(angle) * (obj.radius + 6),
+            turretType: tType,
+            x: bx,
+            y: by,
             vx: Math.cos(angle) * 680,
             vy: Math.sin(angle) * 680,
             damage: bulletDamage,
-            radius: 5,
-            character: "turret_plasma",
+            radius: tType === "gold" ? 7 : (tType === "alien" ? 6 : 5),
+            character: config.bulletType || "turret_plasma",
             bornAt: wallNow,
             expiresAt: wallNow + 1400,
           });
+
           io.to(this.room).emit("turret_fired", {
             id: obj.id,
             angle,
-            x: obj.x,
-            y: obj.y,
+            x: bx,
+            y: by,
+            turretType: tType,
+            barrelIndex: barrelIdx,
           });
+        }
+        obj.burstIndex = (obj.burstIndex || 0) + 1;
+        obj.burstRemaining--;
+        obj.nextBurstShotAt = wallNow + (config.burstDelay || 90);
+      }
+
+      // Check ready for next primary shot / burst volley
+      if (wallNow - (obj.lastShotAt || 0) >= cooldown && this.waveState === "active" && (!obj.burstRemaining || obj.burstRemaining <= 0)) {
+        const closestEnemy = findClosestTarget();
+        if (closestEnemy) {
+          obj.lastShotAt = wallNow;
+          const angle = Math.atan2(closestEnemy.y - obj.y, closestEnemy.x - obj.x);
+          obj.angle = angle;
+          const lateralOffset = (config.barrelOffsets && config.barrelOffsets[0]) || 0;
+          const forwardDist = obj.radius + 6;
+          const bx = obj.x + Math.cos(angle) * forwardDist - Math.sin(angle) * lateralOffset;
+          const by = obj.y + Math.sin(angle) * forwardDist + Math.cos(angle) * lateralOffset;
+          const bulletDamage = (obj.baseDamage || 2.2) + (this.turretDamageBoost || 0);
+
+          bullets.push({
+            id: nextBulletId++,
+            room: this.room,
+            ownerId: "turret_" + obj.id,
+            turretType: tType,
+            x: bx,
+            y: by,
+            vx: Math.cos(angle) * 680,
+            vy: Math.sin(angle) * 680,
+            damage: bulletDamage,
+            radius: tType === "gold" ? 7 : (tType === "alien" ? 6 : 5),
+            character: config.bulletType || "turret_plasma",
+            bornAt: wallNow,
+            expiresAt: wallNow + 1400,
+          });
+
+          io.to(this.room).emit("turret_fired", {
+            id: obj.id,
+            angle,
+            x: bx,
+            y: by,
+            turretType: tType,
+            barrelIndex: 0,
+          });
+
+          if (config.burstCount > 1) {
+            obj.burstRemaining = config.burstCount - 1;
+            obj.burstIndex = 1;
+            obj.nextBurstShotAt = wallNow + (config.burstDelay || 100);
+          }
         }
       }
     }
 
     // 4. Placed Traps state cycling
     for (const obj of this.placedObjects) {
-      if (obj.type !== "trap") continue;
+      if (!obj || obj.type !== "trap") continue;
       if (obj.state === "frozen") {
-        if (wallNow >= obj.frozenUntil) {
+        if (wallNow >= (obj.frozenUntil || 0)) {
           obj.state = "recovery";
           obj.recoveryUntil = wallNow + (this.trapRecoveryTime || 5000);
           obj.frozenEnemyId = null;
           io.to(this.room).emit("trap_state_changed", { id: obj.id, state: "recovery" });
         }
       } else if (obj.state === "recovery") {
-        if (wallNow >= obj.recoveryUntil) {
+        if (wallNow >= (obj.recoveryUntil || 0)) {
           obj.state = "ready";
           io.to(this.room).emit("trap_state_changed", { id: obj.id, state: "ready" });
         }
@@ -1624,10 +2270,11 @@ class HordeGame {
 
     // 5. Enemy Dodge AI
     for (const enemy of this.enemies) {
+      if (!enemy) continue;
       if (!enemy.hasDodge || wallNow < enemy.dodgeReadyAt || wallNow < enemy.dodgeUntil) continue;
       if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) continue;
       for (const b of bullets) {
-        if (b.room !== this.room) continue;
+        if (!b || b.room !== this.room) continue;
         const bSpeed = Math.hypot(b.vx, b.vy);
         if (bSpeed < 50) continue;
         const toX = enemy.x - b.x;
@@ -1657,6 +2304,32 @@ class HordeGame {
     // 6. Move enemies and collisions
     for (let ei = this.enemies.length - 1; ei >= 0; ei--) {
       const enemy = this.enemies[ei];
+      if (!enemy) continue;
+
+      // Fire Turret burning DoT effect (refreshes duration on hit, non-stacking)
+      if (enemy.burningUntil && wallNow < enemy.burningUntil) {
+        const burnDmg = (enemy.burnDps || 0.176) * dt;
+        enemy.hp -= burnDmg;
+        if (enemy.hp <= 0) {
+          for (const pid of roomPlayerIds) {
+            const pl = players.get(pid);
+            if (pl && pl.active) awardXp(pl, Math.max(1, Math.round(enemy.xp * 0.5)));
+          }
+          io.to(this.room).emit("enemy_killed", {
+            enemyId: enemy.id,
+            type: enemy.type,
+            x: enemy.x,
+            y: enemy.y,
+            killerId: "fire_dot",
+            xp: enemy.xp,
+          });
+          this.enemies.splice(ei, 1);
+          if (enemy.type === "cyborgian_9" || enemy.isSplitter) {
+            this.spawnCyborgianSplit(enemy, io);
+          }
+          continue;
+        }
+      }
 
       // Frozen or Stunned check
       if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) {
@@ -1665,7 +2338,7 @@ class HordeGame {
 
       // Check interaction with placed traps (Expanded cryo field)
       for (const obj of this.placedObjects) {
-        if (obj.type !== "trap") continue;
+        if (!obj || obj.type !== "trap") continue;
         const d = Math.hypot(enemy.x - obj.x, enemy.y - obj.y);
         const triggerDist = (obj.radius || 60) + enemy.radius;
         if (d <= triggerDist) {
@@ -1737,10 +2410,13 @@ class HordeGame {
           const nx = dx / dist;
           const ny = dy / dist;
           enemy.facing = { x: nx, y: ny };
-          const minStopDist = closestPlayer ? (enemy.radius + characterRadius(closestPlayer.character) - 4) : (enemy.radius + 38);
+          let moveSpeed = enemy.speed;
+          if (enemy.slowedUntil && wallNow < enemy.slowedUntil) {
+            moveSpeed *= 0.75;
+          }
           if (dist > minStopDist) {
-            enemy.x += nx * enemy.speed * dt;
-            enemy.y += ny * enemy.speed * dt;
+            enemy.x += nx * moveSpeed * dt;
+            enemy.y += ny * moveSpeed * dt;
           }
         }
       }
@@ -1819,9 +2495,12 @@ class HordeGame {
             this.waveState = "game_over";
             this.intermissionUntil = wallNow + 6500;
             this.enemies = [];
+            this.boss = null;
+            this.isBossWave = false;
             clearTimeout(this.upgradeTimeout);
             this.pendingPlayersToChoose.clear();
             io.to(this.room).emit("base_destroyed", { wave: this.wave });
+            return;
           }
         }
       }
@@ -1829,6 +2508,7 @@ class HordeGame {
       // Player interaction: Deflect/Parry, Tactical Dodge damage, or Melee damage
       let enemyKilledThisTick = false;
       for (const pid of roomPlayerIds) {
+        if (!enemy) break;
         const p = players.get(pid);
         if (!p || !p.active || p.health <= 0) continue;
         const pDist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
@@ -1982,6 +2662,7 @@ class HordeGame {
         }
 
         if (p.protectedUntil > wallNow) continue;
+        if (!enemy) break;
         if ((enemy.frozenUntil && enemy.frozenUntil > wallNow) || (enemy.stunnedUntil && enemy.stunnedUntil > wallNow)) continue;
 
         // 4. Melee damage to player
@@ -2705,6 +3386,13 @@ io.use(async (socket, next) => {
 });
 io.on("connection", (socket) => {
   const { id: discordId, name, instanceId, mode: initialMode } = socket.data.identity;
+  const isGuest = Boolean(socket.data.identity?.isGuest);
+  let playerInv = null;
+  if (!isGuest) {
+    playerInv = inventoryStorage.getInventory(discordId);
+  } else {
+    playerInv = getGuestInventory(socket.id);
+  }
   const currentMode = initialMode === "horde" ? "horde" : "ffa";
   const room = `activity:${instanceId}:${currentMode}`;
   socket.join(room);
@@ -2738,6 +3426,7 @@ io.on("connection", (socket) => {
     character: defaultChar,
     mode: currentMode,
     lastFfaCharacter: "granny",
+    equippedTurret: playerInv.equippedTurret || "default",
     keys: { up: false, down: false, left: false, right: false },
     facing: { x: 1, y: 0 },
     parryId: 0,
@@ -2772,6 +3461,21 @@ io.on("connection", (socket) => {
     lastSoundwavePulseAt: 0,
   };
   players.set(socket.id, p);
+
+  // Sync inventory state to player
+  socket.emit("inventory_sync", {
+    inventory: playerInv,
+    isAdmin: !isGuest && discordId === ADMIN_DISCORD_ID,
+    isGuest,
+  });
+
+  // Check pending gifts for authenticated user
+  if (!isGuest) {
+    const pending = inventoryStorage.getPendingGiftsForUser(discordId);
+    if (pending && pending.length > 0) {
+      socket.emit("pending_gifts", { gifts: pending });
+    }
+  }
   if (!rooms.has(room)) rooms.set(room, new Set());
   rooms.get(room).add(socket.id);
   socket.emit("init", {
@@ -2939,6 +3643,33 @@ io.on("connection", (socket) => {
     };
     socket.emit("horde_upgrade_options", payload);
   });
+  socket.on("dev_spawn_boss", (payload) => {
+    const horde = hordeGames.get(p.room);
+    if (!horde) return;
+    const activeCount = Math.max(1, [...(rooms.get(p.room) || [])].filter(id => players.get(id)?.active).length);
+    const bossType = payload?.type || "baby_cyborg";
+    horde.isBossWave = true;
+    horde.enemiesToSpawnThisWave = 0;
+    horde.enemies = [];
+    if (bossType === "baby_cyborg") {
+      io.to(horde.room).emit("boss_music_intro", { bossId: "boss_baby_cyborg" });
+      horde.spawnBabyCyborg(activeCount, io);
+      io.to(horde.room).emit("wave_started", {
+        wave: horde.wave,
+        totalEnemies: 1,
+        isBossWave: true,
+        bossType: "baby_cyborg",
+      });
+    } else {
+      horde.spawnBoss(activeCount, io);
+      io.to(horde.room).emit("wave_started", {
+        wave: horde.wave,
+        totalEnemies: 1,
+        isBossWave: true,
+        bossType: "tung",
+      });
+    }
+  });
   socket.on("place_horde_object", (payload) => {
     if (p.mode !== "horde") return;
     if (Date.now() < (p.stunnedUntil || 0)) return;
@@ -2961,24 +3692,45 @@ io.on("connection", (socket) => {
     if (idx === -1) return;
     p.pendingPlacements.splice(idx, 1);
 
-    const isBarricade = type === "wall" || type === "barricade";
+    let turretType = "default";
+    let baseRadius = isBarricade ? 30 : (type === "turret" ? 22 : 60);
+    let baseHp = isBarricade ? 60 : (type === "turret" ? 28 : 100);
+    let baseRange = 240;
+    let baseCooldown = 750;
+    let baseDamage = 2.2;
+
+    if (type === "turret") {
+      const pInv = p?.discordId ? inventoryStorage.getInventory(p.discordId) : null;
+      turretType = pInv?.equippedTurret || p?.equippedTurret || "default";
+      const cfg = TURRET_TYPES[turretType] || TURRET_TYPES.default;
+      baseHp = Math.round(28 * (cfg.healthMultiplier || 1.0));
+      baseRadius = Math.round(22 * (cfg.sizeMultiplier || 1.0));
+      baseRange = Math.round(240 * (cfg.rangeMultiplier || 1.0));
+      baseCooldown = Math.round(750 * (cfg.cooldownMultiplier || 1.0));
+      baseDamage = Math.round(2.2 * (cfg.damageMultiplier || 1.0) * 10) / 10;
+    }
+
     const newObj = {
       id: horde.nextObjectId++,
       type: isBarricade ? "barricade" : type,
+      turretType: type === "turret" ? turretType : undefined,
       ownerId: p.id,
       x: Math.round(x),
       y: Math.round(y),
-      radius: isBarricade ? 30 : (type === "turret" ? 22 : 60),
-      hp: isBarricade ? 60 : (type === "turret" ? 28 : 100),
-      maxHp: isBarricade ? 60 : (type === "turret" ? 28 : 100),
+      radius: baseRadius,
+      hp: baseHp,
+      maxHp: baseHp,
       angle: Number.isFinite(angle) ? angle : 0,
       state: "ready",
       lastShotAt: 0,
-      baseRange: 240,
-      baseCooldown: 750,
-      baseDamage: 2.2,
+      baseRange,
+      baseCooldown,
+      baseDamage,
       frozenUntil: 0,
       recoveryUntil: 0,
+      burstRemaining: 0,
+      nextBurstShotAt: 0,
+      burstIndex: 0,
     };
     horde.placedObjects.push(newObj);
     io.to(p.room).emit("horde_object_placed", { object: newObj });
@@ -3012,6 +3764,7 @@ io.on("connection", (socket) => {
     const horde = hordeGames.get(p.room);
     if (horde) {
       for (const enemy of horde.enemies) {
+        if (!enemy) continue;
         const dx = enemy.x - p.x;
         const dy = enemy.y - p.y;
         const d = Math.hypot(dx, dy);
@@ -3323,7 +4076,208 @@ io.on("connection", (socket) => {
       expiresAt: now + (p.character === "sigmatom" ? 2800 : (canSplit ? 1200 : BULLET_LIFETIME)),
     });
   });
+
+  // === INVENTORY & CS CASE OPENING HANDLERS ===
+  socket.on("get_inventory", () => {
+    const inv = isGuest ? getGuestInventory(socket.id) : inventoryStorage.getInventory(discordId);
+    socket.emit("inventory_sync", {
+      inventory: inv,
+      isAdmin: !isGuest && discordId === ADMIN_DISCORD_ID,
+      isGuest,
+    });
+  });
+
+  socket.on("open_turret_case", () => {
+    if (isGuest) {
+      const gInv = getGuestInventory(socket.id);
+      if (gInv.keys < 1) {
+        return socket.emit("case_opening_result", {
+          success: false,
+          error: "You have no keys remaining. Connect via Discord to receive permanent keys!",
+        });
+      }
+      gInv.keys -= 1;
+      const roll = crypto.randomInt(0, 10000);
+      let winningTurretId = "fire";
+      if (roll < 2950) winningTurretId = "fire";
+      else if (roll < 5900) winningTurretId = "ice";
+      else if (roll < 8850) winningTurretId = "double_barrel";
+      else if (roll < 9350) winningTurretId = "alien";
+      else if (roll < 9850) winningTurretId = "tripple_barrel";
+      else winningTurretId = "gold";
+
+      const isDup = gInv.unlockedTurrets.includes(winningTurretId);
+      let frags = 0;
+      if (isDup) {
+        frags = DUPLICATE_FRAGMENTS[TURRET_TYPES[winningTurretId].rarity] || 10;
+        gInv.fragments += frags;
+      } else {
+        gInv.unlockedTurrets.push(winningTurretId);
+      }
+      socket.emit("case_opening_result", {
+        success: true,
+        winningTurretId,
+        turret: TURRET_TYPES[winningTurretId],
+        isDuplicate: isDup,
+        fragmentsAwarded: frags,
+        inventory: gInv,
+      });
+      socket.emit("inventory_sync", {
+        inventory: gInv,
+        isAdmin: false,
+        isGuest: true,
+      });
+      return;
+    }
+
+    const res = inventoryStorage.openTurretCase(discordId);
+    socket.emit("case_opening_result", res);
+    if (res.success) {
+      socket.emit("inventory_sync", {
+        inventory: res.inventory,
+        isAdmin: discordId === ADMIN_DISCORD_ID,
+        isGuest: false,
+      });
+    }
+  });
+
+  socket.on("craft_key", () => {
+    if (isGuest) {
+      const gInv = getGuestInventory(socket.id);
+      if (gInv.fragments < FRAGMENTS_PER_KEY) {
+        return socket.emit("craft_result", {
+          success: false,
+          error: `Need ${FRAGMENTS_PER_KEY} fragments (have ${gInv.fragments})`,
+        });
+      }
+      gInv.fragments -= FRAGMENTS_PER_KEY;
+      gInv.keys += 1;
+      return socket.emit("inventory_sync", {
+        inventory: gInv,
+        isAdmin: false,
+        isGuest: true,
+      });
+    }
+    const res = inventoryStorage.craftKeyFromFragments(discordId);
+    if (res.success) {
+      socket.emit("inventory_sync", {
+        inventory: res.inventory,
+        isAdmin: discordId === ADMIN_DISCORD_ID,
+        isGuest: false,
+      });
+    } else {
+      socket.emit("craft_result", res);
+    }
+  });
+
+  socket.on("equip_turret", (data) => {
+    const turretId = typeof data === "string" ? data : data?.turretId;
+    if (!turretId || !TURRET_TYPES[turretId]) return;
+    if (isGuest) {
+      const gInv = getGuestInventory(socket.id);
+      if (gInv.unlockedTurrets.includes(turretId)) {
+        gInv.equippedTurret = turretId;
+        p.equippedTurret = turretId;
+        socket.emit("inventory_sync", {
+          inventory: gInv,
+          isAdmin: false,
+          isGuest: true,
+        });
+      }
+      return;
+    }
+    const res = inventoryStorage.equipTurret(discordId, turretId);
+    if (res.success) {
+      p.equippedTurret = turretId;
+      socket.emit("inventory_sync", {
+        inventory: res.inventory,
+        isAdmin: discordId === ADMIN_DISCORD_ID,
+        isGuest: false,
+      });
+    }
+  });
+
+  // === ADMIN GIFTING PROTOCOL ===
+  socket.on("admin_send_gift", (data) => {
+    if (isGuest || discordId !== ADMIN_DISCORD_ID) {
+      return socket.emit("admin_error", { error: "Forbidden: Not an authorized administrator." });
+    }
+    const rawTarget = String(data?.recipientDiscordId || data?.recipientId || "").trim();
+    const keys = parseInt(data?.keys, 10);
+    const note = (data?.note || "").trim();
+
+    // Check if target matches an active online player username
+    let finalRecipientId = rawTarget;
+    for (const [, s] of io.sockets.sockets) {
+      if (!s.data?.identity?.isGuest) {
+        if (s.data?.identity?.id === rawTarget || (s.data?.identity?.username && s.data.identity.username.toLowerCase() === rawTarget.toLowerCase())) {
+          finalRecipientId = s.data.identity.id;
+          break;
+        }
+      }
+    }
+
+    const res = inventoryStorage.createAdminGift(ADMIN_DISCORD_ID, finalRecipientId, keys, note);
+    if (!res.success) {
+      return socket.emit("admin_error", { error: res.error });
+    }
+
+    // Success response to admin with updated history
+    socket.emit("admin_gift_sent", {
+      success: true,
+      gift: res.gift,
+      allGifts: inventoryStorage.getAllGiftsHistory(ADMIN_DISCORD_ID),
+    });
+
+    // Check if recipient is online right now and notify them immediately
+    for (const [, s] of io.sockets.sockets) {
+      if (s.data?.identity?.id === finalRecipientId && !s.data?.identity?.isGuest) {
+        s.emit("key_gift_received", { gift: res.gift });
+      }
+    }
+  });
+
+  socket.on("admin_get_gifts", () => {
+    if (isGuest || discordId !== ADMIN_DISCORD_ID) {
+      return socket.emit("admin_error", { error: "Forbidden: Not an authorized administrator." });
+    }
+    socket.emit("admin_gifts_list", {
+      gifts: inventoryStorage.getAllGiftsHistory(ADMIN_DISCORD_ID),
+    });
+  });
+
+  socket.on("claim_gift", (data) => {
+    if (isGuest) {
+      return socket.emit("gift_error", { error: "Guests cannot claim Discord gifts." });
+    }
+    const giftId = typeof data === "string" ? data : data?.giftId;
+    const res = inventoryStorage.claimGift(discordId, giftId);
+    if (res.success) {
+      socket.emit("gift_claimed", {
+        giftId: res.gift.id,
+        addedKeys: res.addedKeys,
+      });
+      socket.emit("inventory_sync", {
+        inventory: res.inventory,
+        isAdmin: discordId === ADMIN_DISCORD_ID,
+        isGuest: false,
+      });
+    } else {
+      socket.emit("gift_error", { error: res.error });
+    }
+  });
+
+  socket.on("decline_gift", (data) => {
+    if (isGuest) return;
+    const giftId = typeof data === "string" ? data : data?.giftId;
+    const res = inventoryStorage.declineGift(discordId, giftId);
+    if (res.success) {
+      socket.emit("gift_declined", { giftId: res.gift.id });
+    }
+  });
+
   socket.on("disconnect", () => {
+    guestInventories.delete(socket.id);
     if (score.socketId === socket.id) score.socketId = null;
     players.delete(socket.id);
     const horde = hordeGames.get(p.room);
@@ -3681,6 +4635,7 @@ setInterval(() => {
     if (horde) {
       for (let ei = horde.enemies.length - 1; ei >= 0; ei--) {
         const enemy = horde.enemies[ei];
+        if (!enemy) continue;
         const dx = enemy.x - p.x;
         const dy = enemy.y - p.y;
         const dist = Math.hypot(dx, dy);
@@ -3781,8 +4736,9 @@ setInterval(() => {
       const isHorde = bullet.room.endsWith(":horde");
       const horde = isHorde ? hordeGames.get(bullet.room) : null;
 
-      if (horde && horde.enemies.length > 0) {
+      if (horde && Array.isArray(horde.enemies) && horde.enemies.length > 0) {
         for (const enemy of horde.enemies) {
+          if (!enemy) continue;
           const d = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
           if (d < nearestDist) {
             nearestDist = d;
@@ -3997,11 +4953,33 @@ setInterval(() => {
         let hitEnemy = false;
         for (let ei = horde.enemies.length - 1; ei >= 0; ei--) {
           const enemy = horde.enemies[ei];
+          if (!enemy) continue;
           if (sweptBulletTouchesCircle(bullet, previousX, previousY, enemy.x, enemy.y, enemy.radius)) {
             enemy.hp -= bullet.damage;
             const bSpeed = Math.hypot(bullet.vx, bullet.vy) || 1;
             enemy.recoilVx += (bullet.vx / bSpeed) * 140;
             enemy.recoilVy += (bullet.vy / bSpeed) * 140;
+
+            // Apply special turret effects to normal enemies (bosses immune)
+            if (bullet.turretType === "fire") {
+              enemy.burningUntil = Math.max(enemy.burningUntil || 0, wallNow + 2500);
+              enemy.burnDps = 2.2 * 0.08;
+            } else if (bullet.turretType === "ice") {
+              enemy.slowedUntil = Math.max(enemy.slowedUntil || 0, wallNow + 1750);
+            } else if (bullet.turretType === "alien") {
+              if (!enemy.knockbackImmuneUntil || enemy.knockbackImmuneUntil <= wallNow) {
+                enemy.knockbackImmuneUntil = wallNow + 800;
+                const kDist = 22;
+                enemy.x += (bullet.vx / bSpeed) * kDist;
+                enemy.y += (bullet.vy / bSpeed) * kDist;
+                const dFromCenter = Math.hypot(enemy.x - ARENA_CENTER.x, enemy.y - ARENA_CENTER.y);
+                if (dFromCenter > ARENA_RADIUS - 10) {
+                  const norm = (ARENA_RADIUS - 10) / dFromCenter;
+                  enemy.x = ARENA_CENTER.x + (enemy.x - ARENA_CENTER.x) * norm;
+                  enemy.y = ARENA_CENTER.y + (enemy.y - ARENA_CENTER.y) * norm;
+                }
+              }
+            }
             const isKill = enemy.hp <= 0;
             io.to(bullet.ownerId).emit("hit_marker", {
               targetId: "enemy_" + enemy.id,
@@ -4047,7 +5025,7 @@ setInterval(() => {
         }
         if (hitEnemy) continue;
 
-        const isPlayerOrTurretBullet = bullet.ownerId !== "boss_tung" && !String(bullet.ownerId).startsWith("spiral_");
+        const isPlayerOrTurretBullet = bullet.ownerId !== "boss_tung" && bullet.ownerId !== "boss_baby_cyborg" && !String(bullet.ownerId).startsWith("clone_") && !String(bullet.ownerId).startsWith("spiral_");
         if (isPlayerOrTurretBullet && horde.boss && horde.boss.phase === "spiral_phase" && Array.isArray(horde.boss.spirals)) {
           let hitSpiral = false;
           for (let si = horde.boss.spirals.length - 1; si >= 0; si--) {
@@ -4094,52 +5072,174 @@ setInterval(() => {
         }
 
         if (isPlayerOrTurretBullet && horde.boss && horde.boss.phase !== "intro" && horde.boss.phase !== "defeated" && horde.boss.stompState !== "airborne") {
-          if (sweptBulletTouchesCircle(bullet, previousX, previousY, horde.boss.x, horde.boss.y, horde.boss.radius)) {
-            if (horde.boss.isInvincible) {
-              io.to(bullet.room).emit("boss_shield_deflect", {
-                bossId: horde.boss.id,
-                x: bullet.x,
-                y: bullet.y,
-              });
-              bullets.splice(i, 1);
-              continue;
-            } else {
-              horde.boss.hp = Math.max(0, horde.boss.hp - bullet.damage);
-              const isDefeated = horde.boss.hp <= 0;
-              io.to(bullet.ownerId).emit("hit_marker", {
-                targetId: "boss_tung",
-                damage: bullet.damage,
-                kill: isDefeated,
-              });
-              io.to(bullet.room).emit("boss_hit", {
-                bossId: horde.boss.id,
-                damage: bullet.damage,
-                hp: horde.boss.hp,
-                maxHp: horde.boss.maxHp,
-                x: bullet.x,
-                y: bullet.y,
-              });
-              if (isDefeated) {
-                horde.boss.phase = "defeated";
-                horde.boss.animState = "idle";
-                const killer = players.get(bullet.ownerId);
-                if (killer) {
-                  killer.score.kills = (killer.score.kills || 0) + 1;
-                  awardXp(killer, 1500, false);
-                }
-                for (const pid of roomPlayers) {
-                  const pl = players.get(pid);
-                  if (pl && pl.active && pl.id !== bullet.ownerId) {
-                    awardXp(pl, 1200);
+          if (horde.boss.id === "boss_baby_cyborg") {
+            // Phase 3 Clones Bullet Collision
+            if (horde.boss.phase === "phase3" && Array.isArray(horde.boss.clones)) {
+              let hitClone = false;
+              for (const clone of horde.boss.clones) {
+                if (!clone.alive || clone.hp <= 0) continue;
+                if (sweptBulletTouchesCircle(bullet, previousX, previousY, clone.x, clone.y, clone.radius)) {
+                  clone.hp = Math.max(0, clone.hp - bullet.damage);
+                  const isCloneKilled = clone.hp <= 0;
+                  if (isCloneKilled) {
+                    clone.alive = false;
+                    io.to(bullet.room).emit("boss_clone_destroyed", { cloneId: clone.id, x: clone.x, y: clone.y });
                   }
+                  horde.boss.hp = horde.boss.clones.filter(c => c.alive).reduce((sum, c) => sum + c.hp, 0);
+                  const allDefeated = horde.boss.clones.every(c => !c.alive || c.hp <= 0);
+
+                  io.to(bullet.ownerId).emit("hit_marker", {
+                    targetId: clone.id,
+                    damage: bullet.damage,
+                    kill: isCloneKilled,
+                  });
+                  io.to(bullet.room).emit("boss_hit", {
+                    bossId: horde.boss.id,
+                    cloneId: clone.id,
+                    damage: bullet.damage,
+                    hp: horde.boss.hp,
+                    maxHp: horde.boss.maxHp,
+                    x: bullet.x,
+                    y: bullet.y,
+                  });
+
+                  if (allDefeated) {
+                    horde.boss.phase = "defeated";
+                    horde.boss.animState = "idle";
+                    const killer = players.get(bullet.ownerId);
+                    if (killer) {
+                      killer.score.kills = (killer.score.kills || 0) + 1;
+                      awardXp(killer, 2500, false);
+                    }
+                    for (const pid of roomPlayers) {
+                      const pl = players.get(pid);
+                      if (pl && pl.active && pl.id !== bullet.ownerId) {
+                        awardXp(pl, 2000);
+                      }
+                    }
+                    io.to(bullet.room).emit("boss_defeated", {
+                      bossId: horde.boss.id,
+                      killerId: bullet.ownerId,
+                    });
+                  }
+
+                  bullets.splice(i, 1);
+                  hitClone = true;
+                  break;
                 }
-                io.to(bullet.room).emit("boss_defeated", {
-                  bossId: horde.boss.id,
-                  killerId: bullet.ownerId,
-                });
               }
-              bullets.splice(i, 1);
-              continue;
+              if (hitClone) continue;
+            } else if (horde.boss.phase === "phase1" || horde.boss.phase === "phase2") {
+              // Main Boss Body collision in Phase 1 & 2
+              if (sweptBulletTouchesCircle(bullet, previousX, previousY, horde.boss.x, horde.boss.y, horde.boss.radius)) {
+                if (horde.boss.isInvincible) {
+                  io.to(bullet.room).emit("boss_shield_deflect", {
+                    bossId: horde.boss.id,
+                    x: bullet.x,
+                    y: bullet.y,
+                  });
+                  bullets.splice(i, 1);
+                  continue;
+                }
+
+                horde.boss.hp = Math.max(0, horde.boss.hp - bullet.damage);
+
+                // Check phase thresholds
+                if (horde.boss.phase === "phase1" && horde.boss.hp <= horde.boss.maxHp * BABY_CYBORG_CONFIG.phaseThresholds.phase2) {
+                  horde.boss.phase = "phase2";
+                  horde.boss.laserState = "idle";
+                  horde.boss.stompState = "idle";
+                  horde.boss.lastAttackAt = Date.now() + 1000;
+                  horde.boss.attackType = "stomp";
+                  io.to(bullet.room).emit("boss_phase_changed", {
+                    bossId: horde.boss.id,
+                    phase: "phase2",
+                    subtitle: "BABY TANTRUM",
+                    hp: horde.boss.hp,
+                  });
+                }
+
+                if (horde.boss.hp <= horde.boss.maxHp * BABY_CYBORG_CONFIG.phaseThresholds.phase3) {
+                  horde.boss.phase = "phase3_cloning";
+                  horde.boss.isInvincible = true;
+                  horde.boss.laserState = "idle";
+                  horde.boss.stompState = "idle";
+                  horde.boss.transformationUntil = Date.now() + BABY_CYBORG_CONFIG.transformationDuration;
+                  io.to(bullet.room).emit("boss_phase_changed", {
+                    bossId: horde.boss.id,
+                    phase: "phase3_cloning",
+                    subtitle: "CLONE PROTOCOL",
+                    hp: horde.boss.hp,
+                    transformationUntil: horde.boss.transformationUntil,
+                  });
+                }
+
+                io.to(bullet.ownerId).emit("hit_marker", {
+                  targetId: horde.boss.id,
+                  damage: bullet.damage,
+                  kill: false,
+                });
+                io.to(bullet.room).emit("boss_hit", {
+                  bossId: horde.boss.id,
+                  damage: bullet.damage,
+                  hp: horde.boss.hp,
+                  maxHp: horde.boss.maxHp,
+                  x: bullet.x,
+                  y: bullet.y,
+                });
+                bullets.splice(i, 1);
+                continue;
+              }
+            }
+          } else {
+            // Tung boss logic
+            if (sweptBulletTouchesCircle(bullet, previousX, previousY, horde.boss.x, horde.boss.y, horde.boss.radius)) {
+              if (horde.boss.isInvincible) {
+                io.to(bullet.room).emit("boss_shield_deflect", {
+                  bossId: horde.boss.id,
+                  x: bullet.x,
+                  y: bullet.y,
+                });
+                bullets.splice(i, 1);
+                continue;
+              } else {
+                horde.boss.hp = Math.max(0, horde.boss.hp - bullet.damage);
+                const isDefeated = horde.boss.hp <= 0;
+                io.to(bullet.ownerId).emit("hit_marker", {
+                  targetId: "boss_tung",
+                  damage: bullet.damage,
+                  kill: isDefeated,
+                });
+                io.to(bullet.room).emit("boss_hit", {
+                  bossId: horde.boss.id,
+                  damage: bullet.damage,
+                  hp: horde.boss.hp,
+                  maxHp: horde.boss.maxHp,
+                  x: bullet.x,
+                  y: bullet.y,
+                });
+                if (isDefeated) {
+                  horde.boss.phase = "defeated";
+                  horde.boss.animState = "idle";
+                  const killer = players.get(bullet.ownerId);
+                  if (killer) {
+                    killer.score.kills = (killer.score.kills || 0) + 1;
+                    awardXp(killer, 1500, false);
+                  }
+                  for (const pid of roomPlayers) {
+                    const pl = players.get(pid);
+                    if (pl && pl.active && pl.id !== bullet.ownerId) {
+                      awardXp(pl, 1200);
+                    }
+                  }
+                  io.to(bullet.room).emit("boss_defeated", {
+                    bossId: horde.boss.id,
+                    killerId: bullet.ownerId,
+                  });
+                }
+                bullets.splice(i, 1);
+                continue;
+              }
             }
           }
         }
@@ -4438,6 +5538,7 @@ setInterval(() => {
       placedObjects: (horde.placedObjects || []).map((o) => ({
         id: o.id,
         type: o.type,
+        turretType: o.turretType || "default",
         ownerId: o.ownerId,
         x: o.x,
         y: o.y,
@@ -4456,6 +5557,7 @@ setInterval(() => {
         x: Math.round(horde.boss.x * 10) / 10,
         y: Math.round(horde.boss.y * 10) / 10,
         radius: horde.boss.radius,
+        renderSize: horde.boss.renderSize || (horde.boss.id === "boss_baby_cyborg" ? 160 : 200),
         hp: Math.max(0, Math.round(horde.boss.hp * 10) / 10),
         maxHp: horde.boss.maxHp,
         phase: horde.boss.phase,
@@ -4463,10 +5565,35 @@ setInterval(() => {
         isInvincible: horde.boss.isInvincible,
         facing: horde.boss.facing,
         animState: horde.boss.animState,
+        introUntil: horde.boss.introUntil || 0,
+        transformationUntil: horde.boss.transformationUntil || 0,
+        laserState: horde.boss.laserState || "idle",
+        laserTarget: horde.boss.laserTarget || null,
         stompState: horde.boss.stompState,
         stompTarget: horde.boss.stompTarget,
+        stompWarnUntil: horde.boss.stompWarnUntil || 0,
+        stompLandUntil: horde.boss.stompLandUntil || 0,
+        stompRadius: horde.boss.stompRadius || 140,
         chargingBarrage: horde.boss.chargingBarrage,
         pendingProjectiles: horde.boss.pendingProjectiles || [],
+        clones: Array.isArray(horde.boss.clones) ? horde.boss.clones.map(c => ({
+          id: c.id,
+          x: Math.round(c.x * 10) / 10,
+          y: Math.round(c.y * 10) / 10,
+          radius: c.radius,
+          renderSize: c.renderSize,
+          hp: Math.max(0, Math.round(c.hp * 10) / 10),
+          maxHp: c.maxHp,
+          alive: c.alive,
+          facing: c.facing || 1,
+          animState: c.animState || "idle",
+          laserState: c.laserState || "idle",
+          laserTarget: c.laserTarget || null,
+          stompState: c.stompState || "idle",
+          stompTarget: c.stompTarget || null,
+          stompWarnUntil: c.stompWarnUntil || 0,
+          stompRadius: c.stompRadius || 110,
+        })) : [],
         spirals: (horde.boss.spirals || []).map(s => ({
           id: s.id,
           x: Math.round(s.x * 10) / 10,
@@ -4494,7 +5621,7 @@ setInterval(() => {
       leaderboard,
       players: state,
       horde: hordePayload,
-      enemies: horde ? horde.enemies.map((e) => ({
+      enemies: (horde && Array.isArray(horde.enemies)) ? horde.enemies.filter(Boolean).map((e) => ({
         id: e.id,
         type: e.type,
         name: e.name,
@@ -4510,6 +5637,8 @@ setInterval(() => {
         dodging: wallNow < e.dodgeUntil,
         frozen: Boolean(e.frozenUntil && wallNow < e.frozenUntil),
         stunned: Boolean(e.stunnedUntil && wallNow < e.stunnedUntil),
+        burning: Boolean(e.burningUntil && wallNow < e.burningUntil),
+        slowed: Boolean(e.slowedUntil && wallNow < e.slowedUntil),
       })) : [],
       objects: isHordeRoom ? [] : (roomObjects.get(room) || []).map((o) => ({
         id: o.id,
