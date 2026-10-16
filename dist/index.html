@@ -3517,7 +3517,7 @@
         color: #fff;
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-BYIzgnPq.js"></script>
+    <script type="module" crossorigin src="/assets/index-BcDNyauu.js"></script>
   </head>
   <body>
     <div id="game-shell">
@@ -3999,13 +3999,18 @@
                 </div>
                 <div class="slider-row">
                   <div class="slider-header">
-                    <label for="quiet-mode-select">Audio Mode</label>
-                    <output id="quiet-mode-status" style="color: var(--accent-cyan); font-weight: 800;">QUIET (DEFAULT)</output>
+                    <label for="quiet-mode-select">Hearing Safety & Auto-Leveller</label>
+                    <output id="quiet-mode-status" style="color: #22c55e; font-weight: 800;">PROTECTED · AUTO-LEVELLER</output>
                   </div>
                   <select id="quiet-mode-select" class="settings-select">
-                    <option value="on" selected>Comfort / Reduced Audio (Default)</option>
-                    <option value="off">Full Dynamic Audio</option>
+                    <option value="auto_protect" selected>🛡️ Smart Ear Protection & Auto-Leveller (Default)</option>
+                    <option value="quiet">Comfort / Extra Quiet (Ear-Safe)</option>
+                    <option value="direct">Studio Limiter (Full Dynamic)</option>
                   </select>
+                  <div class="audio-protection-badge" style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-top: 6px; color: #22c55e; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 6px; padding: 4px 8px;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Automatic Loudness Limiter: Volume auto-ducks during intense combat to prevent ear damage.</span>
+                  </div>
                 </div>
                 <div class="slider-row">
                   <div class="slider-header">
