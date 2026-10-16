@@ -1,5 +1,5 @@
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, ".env"), override: false });
+const { PORT } = require("./server-port.cjs");
 const express = require("express"),
   http = require("http");
 const { Server } = require("socket.io");
@@ -31,8 +31,7 @@ function getGuestInventory(socketId) {
 const app = express(),
   server = http.createServer(app),
   io = new Server(server);
-const PORT = Number(process.env.PORT || 8080),
-  WIDTH = 3600,
+const WIDTH = 3600,
   HEIGHT = 3600,
   ARENA_CENTER = { x: 1800, y: 1800 },
   ARENA_RADIUS = 1650,
