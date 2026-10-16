@@ -222,8 +222,8 @@ const HORDE_CARDS = {
     id: "ability_dodge",
     category: "ability",
     rarity: "rare",
-    name: "Tactical Dodge",
-    desc: "Unlock manual Dodge roll with invulnerability frames (Shift / F) (4s cooldown).",
+    name: "Tactical Dodge & Deflect",
+    desc: "Unlock Deflect shield [R] and Evasive Dodge roll [SHIFT / F] with full invulnerability frames and projectile deflection.",
     icon: "🌀",
     faIcon: "fa-solid fa-wind",
     condition: (player, horde) => !player.hasDodge,
@@ -2964,6 +2964,7 @@ io.on("connection", (socket) => {
     if (
       !p.active ||
       p.health <= 0 ||
+      (p.mode === "horde" && p.character !== "sigmatom" && !p.hasDodge) ||
       now < (p.stunnedUntil || 0) ||
       now < p.parryReadyAt ||
       now < p.dashUntil
