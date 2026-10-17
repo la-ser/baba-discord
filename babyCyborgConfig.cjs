@@ -3,12 +3,12 @@ const BABY_CYBORG_CONFIG = {
   id: "boss_baby_cyborg",
   name: "BABY CYBORG",
 
-  // Dimensions
+  // Dimensions (increased 3x)
   textureSize: 1254,
-  renderSize: 160,          // Visual width and height
-  radius: 50,               // Collision radius for main boss
-  cloneRenderSize: 112,     // 70% of 160
-  cloneRadius: 35,          // 70% of 50
+  renderSize: 480,          // Visual width and height (3x 160)
+  radius: 150,              // Collision radius for main boss (3x 50)
+  cloneRenderSize: 336,     // 70% of 480 (3x 112)
+  cloneRadius: 105,         // 70% of 150 (3x 35)
 
   // Exact normalized coordinates extracted from pixel analysis of red dots in eye overlays:
   // Left eye center: (564.82, 353.33) / 1254 = (0.45042, 0.28176)
@@ -22,9 +22,9 @@ const BABY_CYBORG_CONFIG = {
     normY: 0.26339,
   },
 
-  // Health
-  baseHp: 10000,
-  hpPerExtraPlayer: 3500,
+  // Health (decreased to 2/3: 6667 HP base, 2333 per extra player)
+  baseHp: 6667,
+  hpPerExtraPlayer: 2333,
 
   // Phases
   phaseThresholds: {
@@ -43,13 +43,13 @@ const BABY_CYBORG_CONFIG = {
     warningDuration: 1000,
     firingDuration: 2000,
     dpsPerBeam: 80,
-    range: 850,
+    range: 950,
   },
 
   stomp: {
     cooldown: 9000,
     warningDuration: 1500,
-    radius: 140,
+    radius: 420,
     damage: 175,
   },
 

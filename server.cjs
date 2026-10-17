@@ -611,6 +611,74 @@ const HORDE_CARDS = {
     apply: (player, horde) => {
       horde.trapRecoveryTime = Math.max(1800, (horde.trapRecoveryTime || 5000) - 1000);
     }
+  },
+
+  // Legendary Boss Victory Cards (Exclusive Pinnacle Upgrades)
+  boss_titan_overdrive: {
+    id: "boss_titan_overdrive",
+    family: "damage",
+    category: "upgrade",
+    rarity: "legendary",
+    name: "Titan Overdrive",
+    desc: "+45% bullet damage, +25% fire rate speed, and +25 Max HP permanently.",
+    icon: "👑",
+    faIcon: "fa-solid fa-crown",
+    condition: (player, horde) => true,
+    apply: (player, horde) => {
+      player.bonusDamageMult = Math.min(2.0, Math.round(((player.bonusDamageMult || 0) + 0.45) * 100) / 100);
+      player.fireRateMult = Math.max(0.40, Math.round(((player.fireRateMult || 1.0) * 0.75) * 1000) / 1000);
+      player.bonusMaxHp = (player.bonusMaxHp || 0) + 25;
+      player.health += 25;
+    }
+  },
+  boss_granny_citadel: {
+    id: "boss_granny_citadel",
+    family: "granny_core",
+    category: "utility",
+    rarity: "legendary",
+    name: "Apex Citadel",
+    desc: "Fully repairs Granny Core to 100% HP, +2 Turret Levels, and +2 Healing Aura Levels.",
+    icon: "🏰",
+    faIcon: "fa-solid fa-chess-rook",
+    condition: (player, horde) => true,
+    apply: (player, horde) => {
+      horde.baseHealth = horde.maxBaseHealth;
+      horde.grannyTurretLevel = Math.min(5, (horde.grannyTurretLevel || 0) + 2);
+      horde.healAuraLevel = Math.min(5, (horde.healAuraLevel || 0) + 2);
+    }
+  },
+  boss_hyper_cannon: {
+    id: "boss_hyper_cannon",
+    family: "fire_rate",
+    category: "upgrade",
+    rarity: "legendary",
+    name: "Hyper Accelerator",
+    desc: "+35% faster firing rate and +30% bullet damage boost.",
+    icon: "⚡",
+    faIcon: "fa-solid fa-bolt-lightning",
+    condition: (player, horde) => true,
+    apply: (player, horde) => {
+      player.bonusDamageMult = Math.min(2.0, Math.round(((player.bonusDamageMult || 0) + 0.30) * 100) / 100);
+      player.fireRateMult = Math.max(0.40, Math.round(((player.fireRateMult || 1.0) * 0.65) * 1000) / 1000);
+    }
+  },
+  boss_nanite_matrix: {
+    id: "boss_nanite_matrix",
+    family: "ability",
+    category: "ability",
+    rarity: "legendary",
+    name: "Nanite Immortality",
+    desc: "Restores operative & Granny to 100% HP, +15 Max HP, and unlocks Dash & Deflect.",
+    icon: "💖",
+    faIcon: "fa-solid fa-heart-pulse",
+    condition: (player, horde) => true,
+    apply: (player, horde) => {
+      player.hasDash = true;
+      player.hasDodge = true;
+      player.bonusMaxHp = (player.bonusMaxHp || 0) + 15;
+      player.health = getPlayerMaxHealth(player);
+      horde.baseHealth = horde.maxBaseHealth;
+    }
   }
 };
 HORDE_CARDS.object_wall = HORDE_CARDS.object_barricade;
@@ -650,6 +718,7 @@ class HordeGame {
     this.isBossWave = false;
     this.pendingBossSpawnAt = null;
     this.pendingBossType = null;
+    this.bossDefeatedAt = 0;
 
     // Upgrade Selection State
     this.pendingPlayersToChoose = new Set();
@@ -1622,13 +1691,13 @@ class HordeGame {
             stompTarget: null,
             stompWarnUntil: 0,
             stompLandUntil: 0,
-            stompRadius: 110,
+            stompRadius: 330,
             stompDamage: 125,
           },
           {
             id: "clone_1",
-            x: this.boss.x - 85,
-            y: this.boss.y - 45,
+            x: this.boss.x - 240,
+            y: this.boss.y - 120,
             vx: 0,
             vy: 0,
             radius: BABY_CYBORG_CONFIG.cloneRadius,
@@ -1648,13 +1717,13 @@ class HordeGame {
             stompTarget: null,
             stompWarnUntil: 0,
             stompLandUntil: 0,
-            stompRadius: 110,
+            stompRadius: 330,
             stompDamage: 125,
           },
           {
             id: "clone_2",
-            x: this.boss.x + 85,
-            y: this.boss.y + 45,
+            x: this.boss.x + 240,
+            y: this.boss.y + 120,
             vx: 0,
             vy: 0,
             radius: BABY_CYBORG_CONFIG.cloneRadius,
@@ -1870,16 +1939,94 @@ class HordeGame {
       if (aliveCount === 0) {
         this.boss.phase = "defeated";
         this.boss.animState = "idle";
+        this.bossDefeatedAt = wallNow;
         io.to(this.room).emit("boss_defeated", { bossId: this.boss.id });
       }
     }
   }
 
-  generateCardOptions(player) {
+  generateCardOptions(player, isBossReward = false) {
+    if (isBossReward) {
+      // Curate the absolute best pinnacle cards for boss victory
+      const bossBestCandidates = [];
+      const addIfValid = (card) => {
+        if (!card) return;
+        try {
+          if (typeof card.condition === "function" && !card.condition(player, this)) return;
+        } catch (e) { return; }
+        bossBestCandidates.push(card);
+      };
+
+      // 1. All legendary boss upgrades
+      addIfValid(HORDE_CARDS.boss_titan_overdrive);
+      addIfValid(HORDE_CARDS.boss_granny_citadel);
+      addIfValid(HORDE_CARDS.boss_hyper_cannon);
+      addIfValid(HORDE_CARDS.boss_nanite_matrix);
+
+      // 2. Essential unowned abilities
+      if (!player.hasDash) addIfValid(HORDE_CARDS.ability_dash);
+      if (!player.hasDodge) addIfValid(HORDE_CARDS.ability_dodge);
+
+      // 3. Fallback to top rare cards if needed
+      if (bossBestCandidates.length < 3) {
+        addIfValid(HORDE_CARDS.weapon_hollow_point);
+        addIfValid(HORDE_CARDS.weapon_twin_feed);
+        addIfValid(HORDE_CARDS.repair_all_structures);
+      }
+
+      // Shuffle and pick 3 distinct cards with family diversity if possible
+      const chosen = [];
+      const chosenIds = new Set();
+      const chosenFamilies = new Set();
+
+      const shuffled = [...bossBestCandidates].sort(() => Math.random() - 0.5);
+      for (const card of shuffled) {
+        if (chosen.length >= 3) break;
+        if (!chosenIds.has(card.id) && !chosenFamilies.has(card.family || card.id)) {
+          chosenIds.add(card.id);
+          if (card.family) chosenFamilies.add(card.family);
+          chosen.push({
+            id: card.id,
+            family: card.family || card.category,
+            category: card.category,
+            rarity: card.rarity,
+            name: card.name,
+            desc: card.desc,
+            icon: card.icon,
+            faIcon: card.faIcon,
+          });
+        }
+      }
+
+      if (chosen.length < 3) {
+        for (const card of shuffled) {
+          if (chosen.length >= 3) break;
+          if (!chosenIds.has(card.id)) {
+            chosenIds.add(card.id);
+            chosen.push({
+              id: card.id,
+              family: card.family || card.category,
+              category: card.category,
+              rarity: card.rarity,
+              name: card.name,
+              desc: card.desc,
+              icon: card.icon,
+              faIcon: card.faIcon,
+            });
+          }
+        }
+      }
+
+      if (chosen.length >= 3) {
+        return chosen.slice(0, 3);
+      }
+    }
+
     const available = [];
     const seenCardIds = new Set();
     for (const card of Object.values(HORDE_CARDS)) {
       if (!card || seenCardIds.has(card.id)) continue;
+      if (card.rarity === "legendary") continue; // Legendary cards are reserved exclusively for boss victories
       seenCardIds.add(card.id);
       try {
         if (typeof card.condition === "function" && card.condition(player, this)) {
@@ -2151,6 +2298,135 @@ class HordeGame {
         isBossWave: false,
       });
     }
+  }
+
+  skipToEndOfWave9(io, roomPlayerIds) {
+    clearTimeout(this.upgradeTimeout);
+    this.enemies = [];
+    this.enemiesSpawnedThisWave = 0;
+    this.enemiesToSpawnThisWave = 0;
+    this.boss = null;
+    this.isBossWave = false;
+    this.pendingBossSpawnAt = null;
+    this.pendingBossType = null;
+
+    // Clear any active bullets in the room
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      if (bullets[i].room === this.room) bullets.splice(i, 1);
+    }
+
+    this.wave = 9;
+    this.waveState = "upgrade_selection";
+    this.baseHealth = this.maxBaseHealth;
+
+    // Restore any existing placed objects to max HP
+    for (const obj of this.placedObjects) {
+      obj.hp = obj.maxHp;
+    }
+
+    // Upgrades representing progression through Waves 1 to 8
+    const cardsToGrant = [
+      "ability_dash",
+      "ability_dodge",
+      "weapon_damage",
+      "weapon_piercing_core",
+      "weapon_rapid_fire",
+      "weapon_twin_feed",
+      "granny_turret",
+      "granny_heal_aura",
+    ];
+
+    for (const pid of roomPlayerIds) {
+      const p = players.get(pid);
+      if (!p) continue;
+      p.active = true;
+      p.deadSince = 0;
+      p.level = Math.max(p.level || 1, 9);
+      p.xp = Math.max(p.xp || 0, LEVEL_XP_THRESHOLDS[8] || 1500);
+
+      io.to(p.id).emit("xp_update", {
+        xp: p.xp,
+        level: p.level,
+        lost: false,
+        demoted: false,
+        nextLevelXp: getXpForNextLevel(p.level, true),
+      });
+
+      for (const cardId of cardsToGrant) {
+        const card = HORDE_CARDS[cardId];
+        if (!card) continue;
+        if (cardId === "ability_dash" && p.hasDash) continue;
+        if (cardId === "ability_dodge" && p.hasDodge) continue;
+        this.applyCardUpgrade(p, cardId, io);
+      }
+
+      // Ensure defensive emplacements (2 barricades and 2 sentry turrets) are guarding Granny
+      while (this.placedObjects.filter(o => o.type === "turret").length < 2) {
+        this.autoPlaceObject(p, "turret", io);
+      }
+      while (this.placedObjects.filter(o => o.type === "barricade" || o.type === "wall").length < 2) {
+        this.autoPlaceObject(p, "barricade", io);
+      }
+      this.autoPlaceAllPending(p, io);
+
+      const maxHp = getPlayerMaxHealth(p);
+      p.health = maxHp;
+      io.to(p.id).emit("heal_received", {
+        health: p.health,
+        amount: p.health,
+        source: "secret_boost",
+      });
+    }
+
+    this.pendingPlayersToChoose = new Set();
+    this.cardOfferings.clear();
+
+    for (const pid of roomPlayerIds) {
+      const p = players.get(pid);
+      if (p) {
+        this.pendingPlayersToChoose.add(pid);
+        const cards = this.generateCardOptions(p, false);
+        this.cardOfferings.set(pid, cards);
+        const payload = {
+          wave: 9,
+          options: cards,
+          isBossReward: false,
+          baseHealth: Math.round(this.baseHealth * 10) / 10,
+        };
+        const sock = io.sockets.sockets.get(pid);
+        if (sock) {
+          sock.emit("horde_upgrade_options", payload);
+        }
+        io.to(pid).emit("horde_upgrade_options", payload);
+      }
+    }
+
+    const offeringsObj = {};
+    for (const [pid, cards] of this.cardOfferings.entries()) {
+      offeringsObj[pid] = cards;
+    }
+
+    io.to(this.room).emit("wave_cleared", {
+      wave: 9,
+      baseHealth: Math.round(this.baseHealth * 10) / 10,
+      isUpgrading: true,
+      offerings: offeringsObj,
+    });
+
+    clearTimeout(this.upgradeTimeout);
+    this.upgradeTimeout = setTimeout(() => {
+      if (this.waveState === "upgrade_selection") {
+        for (const pid of this.pendingPlayersToChoose) {
+          const offerings = this.cardOfferings.get(pid);
+          if (offerings && offerings.length > 0) {
+            const p = players.get(pid);
+            if (p) this.applyCardUpgrade(p, offerings[0].id, io);
+          }
+        }
+        this.pendingPlayersToChoose.clear();
+        this.startNextWave(io, roomPlayerIds);
+      }
+    }, 30000);
   }
 
   update(dt, wallNow, roomPlayerIds, bullets, io) {
@@ -2849,8 +3125,13 @@ class HordeGame {
         if (!this.boss || this.boss.phase !== "defeated") {
           return;
         }
+        // Wait 3 seconds for the cinematic music slowdown before opening the reward cards
+        if (wallNow < (this.bossDefeatedAt || wallNow) + 3000) {
+          return;
+        }
       }
       if (this.enemiesSpawnedThisWave >= this.enemiesToSpawnThisWave && this.enemies.length === 0) {
+        const wasBossWave = this.isBossWave;
         if (this.isBossWave) {
           this.boss = null;
           this.isBossWave = false;
@@ -2864,7 +3145,7 @@ class HordeGame {
             p.active = true;
             p.deadSince = 0;
             p.health = Math.min(getPlayerMaxHealth(p), Math.max(p.health, 10) + 10);
-            awardXp(p, 50 + this.wave * 15);
+            awardXp(p, wasBossWave ? 250 : (50 + this.wave * 15));
           }
         }
 
@@ -2875,11 +3156,12 @@ class HordeGame {
           const p = players.get(pid);
           if (p) {
             this.pendingPlayersToChoose.add(pid);
-            const cards = this.generateCardOptions(p);
+            const cards = this.generateCardOptions(p, wasBossWave);
             this.cardOfferings.set(pid, cards);
             const payload = {
               wave: this.wave,
               options: cards,
+              isBossReward: wasBossWave,
               baseHealth: Math.round(this.baseHealth * 10) / 10,
             };
             const sock = io.sockets.sockets.get(pid);
@@ -3031,7 +3313,8 @@ function getPlayerDamageMultiplier(player) {
 function getPlayerMaxHealth(player) {
   if (!player) return MAX_HEALTH;
   const isHorde = player.mode === "horde" || (player.room && player.room.endsWith(":horde"));
-  return getMaxHealth(player.character, player.level || 1, isHorde);
+  const bonusHp = isHorde ? (player.bonusMaxHp || 0) : 0;
+  return getMaxHealth(player.character, player.level || 1, isHorde) + bonusHp;
 }
 
 
@@ -3863,6 +4146,20 @@ io.on("connection", (socket) => {
         bossType: "tung",
       });
     }
+  });
+  socket.on("secret_skip_wave_9", () => {
+    if (p.mode !== "horde") {
+      moveMode("horde");
+    }
+    p.active = true;
+    let horde = hordeGames.get(p.room);
+    if (!horde) {
+      initHordeGame(p.room);
+      horde = hordeGames.get(p.room);
+    }
+    if (!horde) return;
+    const roomPids = rooms.get(p.room) || new Set([p.id]);
+    horde.skipToEndOfWave9(io, roomPids);
   });
   socket.on("place_horde_object", (payload) => {
     if (p.mode !== "horde") return;
@@ -5236,6 +5533,7 @@ setInterval(() => {
                   if (allDefeated) {
                     horde.boss.phase = "defeated";
                     horde.boss.animState = "idle";
+                    horde.bossDefeatedAt = wallNow;
                     const killer = players.get(bullet.ownerId);
                     if (killer) {
                       killer.score.kills = (killer.score.kills || 0) + 1;
@@ -5351,6 +5649,7 @@ setInterval(() => {
                 if (isDefeated) {
                   horde.boss.phase = "defeated";
                   horde.boss.animState = "idle";
+                  horde.bossDefeatedAt = wallNow;
                   const killer = players.get(bullet.ownerId);
                   if (killer) {
                     killer.score.kills = (killer.score.kills || 0) + 1;
@@ -5690,7 +5989,7 @@ setInterval(() => {
         x: Math.round(horde.boss.x * 10) / 10,
         y: Math.round(horde.boss.y * 10) / 10,
         radius: horde.boss.radius,
-        renderSize: horde.boss.renderSize || (horde.boss.id === "boss_baby_cyborg" ? 160 : 200),
+        renderSize: horde.boss.renderSize || (horde.boss.id === "boss_baby_cyborg" ? BABY_CYBORG_CONFIG.renderSize : 200),
         hp: Math.max(0, Math.round(horde.boss.hp * 10) / 10),
         maxHp: horde.boss.maxHp,
         phase: horde.boss.phase,
@@ -5826,4 +6125,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { HORDE_CARDS, HordeGame, server };
+module.exports = { HORDE_CARDS, HordeGame, server, players };
