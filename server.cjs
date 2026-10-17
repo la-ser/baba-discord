@@ -878,17 +878,20 @@ class HordeGame {
 
       // Stomp attack
       stompTimer: wallNow + 14000,
-      stompState: "ready", // "ready" | "stunned_charge" | "airborne" | "landing"
+      stompState: "ready", // "ready" | "stunned_charge" | "airborne" | "impact"
+      stompStartX: spawnX,
+      stompStartY: spawnY,
       stompChargeUntil: 0,
       stompAirborneUntil: 0,
+      stompImpactUntil: 0,
       stompTarget: null,
 
       // Bombs state
       bombs: [],
       lastBombRainAt: 0,
-      bombRainCooldown: Math.max(5500, 7500 - (activeCount - 1) * 600),
+      bombRainCooldown: 3800,
 
-      animState: "stomp",
+      animState: "walk",
       lastPlayerDamageAt: 0,
     };
 
@@ -940,12 +943,17 @@ class HordeGame {
 
     // 1. Intro Cinematic Stomp into Arena
     if (this.boss.phase === "intro") {
-      this.boss.animState = "stomp";
-      if (wallNow >= this.boss.introUntil - 2500) {
-        const targetX = this.boss.spawnSide === "left" ? ARENA_CENTER.x - 700 : ARENA_CENTER.x + 700;
-        const dir = targetX > this.boss.x ? 1 : -1;
-        this.boss.x += dir * 120 * dt;
-        this.boss.facing = dir;
+      if (wallNow < this.boss.introUntil - 700) {
+        this.boss.animState = "walk";
+        if (wallNow >= this.boss.introUntil - 2500) {
+          const targetX = this.boss.spawnSide === "left" ? ARENA_CENTER.x - 700 : ARENA_CENTER.x + 700;
+          const dir = targetX > this.boss.x ? 1 : -1;
+          this.boss.x += dir * 120 * dt;
+          this.boss.facing = dir;
+        }
+      } else {
+        // Grand entrance stomp slam into the arena floor!
+        this.boss.animState = "stomp";
       }
       if (wallNow >= this.boss.introUntil) {
         this.boss.phase = "phase1";
@@ -960,37 +968,53 @@ class HordeGame {
     // 2. Stomp Attack State Management (Phase 3 & Phase 4)
     if (this.boss.stompState === "stunned_charge") {
       this.boss.animState = "stomp";
+      if (this.boss.stompTarget) {
+        this.boss.facing = this.boss.stompTarget.x >= this.boss.x ? 1 : -1;
+      }
       if (wallNow >= this.boss.stompChargeUntil) {
         this.boss.stompState = "airborne";
-        this.boss.stompAirborneUntil = wallNow + 750;
-        io.to(this.room).emit("boss_stomp_airborne", { bossId: this.boss.id });
+        this.boss.stompAirborneUntil = wallNow + 650;
+        io.to(this.room).emit("boss_stomp_airborne", {
+          bossId: this.boss.id,
+          startX: this.boss.stompStartX,
+          startY: this.boss.stompStartY,
+          target: this.boss.stompTarget,
+          duration: 650,
+        });
       }
       return;
     } else if (this.boss.stompState === "airborne") {
-      if (wallNow >= this.boss.stompAirborneUntil) {
-        this.boss.stompState = "ready";
-        this.boss.stompTimer = wallNow + Math.max(7000, 10000 - (activePlayers.length - 1) * 1000);
-        if (this.boss.stompTarget) {
-          this.boss.x = this.boss.stompTarget.x;
-          this.boss.y = this.boss.stompTarget.y;
-        }
-        this.boss.animState = "idle";
+      this.boss.animState = "stomp";
+      const p = Math.min(1, Math.max(0, 1 - (this.boss.stompAirborneUntil - wallNow) / 650));
+      const sx = this.boss.stompStartX != null ? this.boss.stompStartX : this.boss.x;
+      const sy = this.boss.stompStartY != null ? this.boss.stompStartY : this.boss.y;
+      const tx = this.boss.stompTarget ? this.boss.stompTarget.x : this.boss.x;
+      const ty = this.boss.stompTarget ? this.boss.stompTarget.y : this.boss.y;
+      this.boss.x = sx + (tx - sx) * p;
+      this.boss.y = sy + (ty - sy) * p;
 
-        // Slam Damage to targets within 130px core impact zone
+      if (wallNow >= this.boss.stompAirborneUntil) {
+        this.boss.stompState = "impact";
+        this.boss.stompImpactUntil = wallNow + 650;
+        this.boss.x = tx;
+        this.boss.y = ty;
+        this.boss.animState = "stomp";
+
+        // Slam Damage to targets within 140px core impact zone
         for (const p of activePlayers) {
           const d = Math.hypot(p.x - this.boss.x, p.y - this.boss.y);
-          if (d <= 130) {
-            p.health = Math.max(0, p.health - 6.5);
+          if (d <= 140) {
+            p.health = Math.max(0, p.health - 8.5);
             p.lastDamageAt = wallNow;
-            io.to(p.id).emit("damage_taken", { health: p.health, damage: 6.5, source: "boss_stomp" });
+            io.to(p.id).emit("damage_taken", { health: p.health, damage: 8.5, source: "boss_stomp" });
           }
         }
-        if (Math.hypot(ARENA_CENTER.x - this.boss.x, ARENA_CENTER.y - this.boss.y) <= 130) {
-          this.baseHealth = Math.max(0, this.baseHealth - 8);
+        if (Math.hypot(ARENA_CENTER.x - this.boss.x, ARENA_CENTER.y - this.boss.y) <= 140) {
+          this.baseHealth = Math.max(0, this.baseHealth - 10);
         }
 
-        // Expanding Shockwave Ring (radius 360px) -> Stuns players unless dodging
-        const shockwaveRadius = 360;
+        // Expanding Shockwave Ring (radius 380px) -> Stuns players unless dodging
+        const shockwaveRadius = 380;
         for (const p of activePlayers) {
           const d = Math.hypot(p.x - this.boss.x, p.y - this.boss.y);
           if (d <= shockwaveRadius) {
@@ -1005,7 +1029,7 @@ class HordeGame {
         for (const obj of this.placedObjects) {
           const d = Math.hypot(obj.x - this.boss.x, obj.y - this.boss.y);
           if (d <= shockwaveRadius) {
-            obj.hp = Math.max(0, obj.hp - 16);
+            obj.hp = Math.max(0, obj.hp - 20);
           }
         }
 
@@ -1014,7 +1038,20 @@ class HordeGame {
           x: this.boss.x,
           y: this.boss.y,
           radius: shockwaveRadius,
+          impactDuration: 650,
         });
+      }
+      return;
+    } else if (this.boss.stompState === "impact") {
+      this.boss.animState = "stomp";
+      if (this.boss.stompTarget) {
+        this.boss.x = this.boss.stompTarget.x;
+        this.boss.y = this.boss.stompTarget.y;
+      }
+      if (wallNow >= this.boss.stompImpactUntil) {
+        this.boss.stompState = "ready";
+        this.boss.animState = "idle";
+        this.boss.stompTimer = wallNow + Math.max(5000, 7500 - (activePlayers.length - 1) * 600);
       }
       return;
     }
@@ -1037,6 +1074,7 @@ class HordeGame {
           id: this.nextObjectId++,
           x: this.boss.x + Math.cos(sAngle) * spiralDist,
           y: this.boss.y + Math.sin(sAngle) * spiralDist,
+          orbitAngle: sAngle,
           radius: 46,
           hp: sHp,
           maxHp: sHp,
@@ -1060,12 +1098,21 @@ class HordeGame {
       this.boss.animState = "idle";
       this.boss.isInvincible = true;
 
+      const spiralDist = 280;
       for (const spiral of this.boss.spirals) {
-        spiral.angle = (spiral.angle + 0.85 * dt) % (Math.PI * 2);
-        if (wallNow - (spiral.lastShotAt || 0) >= 1450) {
+        // Orbit smoothly around Tung boss
+        spiral.orbitAngle = (spiral.orbitAngle != null ? spiral.orbitAngle : spiral.angle) + 0.55 * dt;
+        spiral.x = this.boss.x + Math.cos(spiral.orbitAngle) * spiralDist;
+        spiral.y = this.boss.y + Math.sin(spiral.orbitAngle) * spiralDist;
+        spiral.angle = (spiral.angle + 1.2 * dt) % (Math.PI * 2);
+
+        if (wallNow - (spiral.lastShotAt || 0) >= 1250) {
           spiral.lastShotAt = wallNow;
-          for (let b = 0; b < 4; b++) {
-            const fireAngle = spiral.angle + b * (Math.PI / 2);
+          // Outward angle facing directly AWAY from the boss center towards the outer arena / players
+          const outwardAngle = spiral.orbitAngle;
+          // Fire a 3-way outward spread fan (all bullets fly away from center and away from other spirals)
+          const spreadAngles = [outwardAngle - 0.38, outwardAngle, outwardAngle + 0.38];
+          for (const fireAngle of spreadAngles) {
             const bx = spiral.x + Math.cos(fireAngle) * 44;
             const by = spiral.y + Math.sin(fireAngle) * 44;
             bullets.push({
@@ -1074,13 +1121,13 @@ class HordeGame {
               ownerId: "spiral_" + spiral.id,
               x: bx,
               y: by,
-              vx: Math.cos(fireAngle) * 440,
-              vy: Math.sin(fireAngle) * 440,
-              damage: 2.6,
-              radius: 9,
+              vx: Math.cos(fireAngle) * 460,
+              vy: Math.sin(fireAngle) * 460,
+              damage: 3.5,
+              radius: 10,
               character: "tung_projectile",
               bornAt: wallNow,
-              expiresAt: wallNow + 1800,
+              expiresAt: wallNow + 2200,
             });
           }
           io.to(this.room).emit("spiral_fired", { id: spiral.id, angle: spiral.angle });
@@ -1092,7 +1139,8 @@ class HordeGame {
         this.boss.isInvincible = false;
         this.boss.isAngry = true;
         this.boss.hp = this.boss.maxHp; // Full health regeneration!
-        this.boss.stompTimer = wallNow + 3500;
+        this.boss.stompTimer = wallNow + 2500;
+        this.boss.lastBombRainAt = wallNow + 1200;
         this.boss.lastAttackAt = wallNow + 1800;
         io.to(this.room).emit("boss_phase_changed", {
           phase: "phase3",
@@ -1105,10 +1153,10 @@ class HordeGame {
       return;
     }
 
-    // C) Phase 3 -> Phase 4 at 50% HP (Bomb Rain begins)
+    // C) Phase 3 -> Phase 4 at 50% HP (Enraged frenzy begins)
     if (this.boss.phase === "phase3" && this.boss.hp <= this.boss.maxHp * 0.5) {
       this.boss.phase = "phase4";
-      this.boss.lastBombRainAt = wallNow + 1800;
+      this.boss.lastBombRainAt = wallNow + 600;
       io.to(this.room).emit("boss_phase_changed", {
         phase: "phase4",
         isAngry: true,
@@ -1117,7 +1165,7 @@ class HordeGame {
       });
     }
 
-    // 4. Stomp Attack Trigger (Phase 3 & Phase 4: every 8-10 seconds)
+    // 4. Stomp Attack Trigger (Phase 3 & Phase 4: every 5-7.5 seconds)
     const stompCandidates = activePlayers.filter(p => !p.protectedUntil || p.protectedUntil <= wallNow);
     if ((this.boss.phase === "phase3" || this.boss.phase === "phase4") &&
         this.boss.stompState === "ready" &&
@@ -1125,38 +1173,95 @@ class HordeGame {
         wallNow >= this.boss.stompTimer &&
         stompCandidates.length > 0) {
       const targetP = stompCandidates[Math.floor(Math.random() * stompCandidates.length)];
+      this.boss.stompStartX = this.boss.x;
+      this.boss.stompStartY = this.boss.y;
       this.boss.stompTarget = { x: targetP.x, y: targetP.y };
       this.boss.stompState = "stunned_charge";
-      this.boss.stompChargeUntil = wallNow + 2000;
+      this.boss.stompChargeUntil = wallNow + 1300;
       this.boss.animState = "stomp";
+      this.boss.facing = this.boss.stompTarget.x >= this.boss.x ? 1 : -1;
       io.to(this.room).emit("boss_stomp_telegraph", {
         bossId: this.boss.id,
+        startX: this.boss.stompStartX,
+        startY: this.boss.stompStartY,
         target: this.boss.stompTarget,
-        duration: 2000,
+        duration: 1300,
+        airborneDuration: 650,
+        impactDuration: 650,
       });
       return;
     }
 
-    // 5. Bomb Rain (Phase 4: at <= 50% HP)
-    if (this.boss.phase === "phase4") {
-      if (wallNow - (this.boss.lastBombRainAt || 0) >= this.boss.bombRainCooldown) {
+    // 5. Massive Bomb Rain (Phase 3 & Phase 4)
+    if (this.boss.phase === "phase3" || this.boss.phase === "phase4") {
+      const isEnraged = this.boss.phase === "phase4";
+      const cooldown = isEnraged ? 2800 : 3800;
+      if (wallNow - (this.boss.lastBombRainAt || 0) >= cooldown) {
         this.boss.lastBombRainAt = wallNow;
-        this.boss.bombs = [];
-        const bombCount = 8 + activePlayers.length * 2;
-        for (let bi = 0; bi < bombCount; bi++) {
-          const bAngle = Math.random() * Math.PI * 2;
-          const bDist = 140 + Math.random() * 380;
-          const bx = Math.max(ARENA_CENTER.x - ARENA_RADIUS + 80, Math.min(ARENA_CENTER.x + ARENA_RADIUS - 80, this.boss.x + Math.cos(bAngle) * bDist));
-          const by = Math.max(ARENA_CENTER.y - ARENA_RADIUS + 80, Math.min(ARENA_CENTER.y + ARENA_RADIUS - 80, this.boss.y + Math.sin(bAngle) * bDist));
-          this.boss.bombs.push({
+
+        // Base bomb count: 18+ in Phase 3, 32+ in Phase 4!
+        const baseCount = isEnraged ? (30 + activePlayers.length * 4) : (16 + activePlayers.length * 3);
+        const newBombs = [];
+
+        // A) Cluster bombs targeted around each active player
+        for (const p of activePlayers) {
+          const pBombs = isEnraged ? 4 : 3;
+          for (let pi = 0; pi < pBombs; pi++) {
+            const pa = Math.random() * Math.PI * 2;
+            const pd = 50 + Math.random() * 180;
+            const px = Math.max(ARENA_CENTER.x - ARENA_RADIUS + 80, Math.min(ARENA_CENTER.x + ARENA_RADIUS - 80, p.x + Math.cos(pa) * pd));
+            const py = Math.max(ARENA_CENTER.y - ARENA_RADIUS + 80, Math.min(ARENA_CENTER.y + ARENA_RADIUS - 80, p.y + Math.sin(pa) * pd));
+            newBombs.push({
+              id: this.nextObjectId++,
+              x: px,
+              y: py,
+              landAt: wallNow + 1300 + Math.random() * 800,
+              duration: 1800,
+              exploded: false,
+            });
+          }
+        }
+
+        // B) Bombs targeting placed defenses
+        if (this.placedObjects.length > 0) {
+          const oTargets = this.placedObjects.slice(0, 4);
+          for (const obj of oTargets) {
+            const oa = Math.random() * Math.PI * 2;
+            const od = Math.random() * 80;
+            newBombs.push({
+              id: this.nextObjectId++,
+              x: obj.x + Math.cos(oa) * od,
+              y: obj.y + Math.sin(oa) * od,
+              landAt: wallNow + 1400 + Math.random() * 800,
+              duration: 1800,
+              exploded: false,
+            });
+          }
+        }
+
+        // C) Carpet bombs scattered across the entire arena
+        const remainingCarpet = Math.max(8, baseCount - newBombs.length);
+        for (let ci = 0; ci < remainingCarpet; ci++) {
+          const ca = Math.random() * Math.PI * 2;
+          const cd = 120 + Math.random() * (ARENA_RADIUS - 200);
+          const cx = Math.max(ARENA_CENTER.x - ARENA_RADIUS + 80, Math.min(ARENA_CENTER.x + ARENA_RADIUS - 80, ARENA_CENTER.x + Math.cos(ca) * cd));
+          const cy = Math.max(ARENA_CENTER.y - ARENA_RADIUS + 80, Math.min(ARENA_CENTER.y + ARENA_RADIUS - 80, ARENA_CENTER.y + Math.sin(ca) * cd));
+          newBombs.push({
             id: this.nextObjectId++,
-            x: bx,
-            y: by,
-            landAt: wallNow + 2000,
+            x: cx,
+            y: cy,
+            landAt: wallNow + 1300 + Math.random() * 900,
+            duration: 1800,
             exploded: false,
           });
         }
-        io.to(this.room).emit("boss_bombs_telegraphed", { bombs: this.boss.bombs });
+
+        // Append to existing bombs (keep active waves, cap at 70 to preserve performance)
+        this.boss.bombs.push(...newBombs);
+        if (this.boss.bombs.length > 70) {
+          this.boss.bombs = this.boss.bombs.slice(-70);
+        }
+        io.to(this.room).emit("boss_bombs_telegraphed", { bombs: newBombs });
       }
 
       for (const bomb of this.boss.bombs) {
@@ -1165,8 +1270,8 @@ class HordeGame {
           for (const p of activePlayers) {
             if (p.protectedUntil && p.protectedUntil > wallNow) continue;
             const d = Math.hypot(p.x - bomb.x, p.y - bomb.y);
-            if (d <= 95) {
-              const dmg = 5.5;
+            if (d <= 105) {
+              const dmg = 8.5;
               p.health = Math.max(0, p.health - dmg);
               p.lastDamageAt = wallNow;
               io.to(p.id).emit("damage_taken", { health: p.health, damage: dmg, source: "tung_bomb" });
@@ -1174,14 +1279,14 @@ class HordeGame {
           }
           for (const obj of this.placedObjects) {
             const d = Math.hypot(obj.x - bomb.x, obj.y - bomb.y);
-            if (d <= 95) {
-              obj.hp = Math.max(0, obj.hp - 20);
+            if (d <= 105) {
+              obj.hp = Math.max(0, obj.hp - 25);
             }
           }
           io.to(this.room).emit("boss_bomb_detonated", { x: bomb.x, y: bomb.y });
         }
       }
-      this.boss.bombs = this.boss.bombs.filter(b => !b.exploded || wallNow - b.landAt < 1200);
+      this.boss.bombs = this.boss.bombs.filter(b => !b.exploded || wallNow - b.landAt < 900);
     }
 
     // 6. 12-Projectile Massive Charging Barrage
@@ -5050,7 +5155,7 @@ setInterval(() => {
         }
         if (hitEnemy) continue;
 
-        const isPlayerOrTurretBullet = bullet.ownerId !== "boss_tung" && bullet.ownerId !== "boss_baby_cyborg" && !String(bullet.ownerId).startsWith("clone_") && !String(bullet.ownerId).startsWith("spiral_");
+        const isPlayerOrTurretBullet = bullet.ownerId !== "boss_tung" && bullet.ownerId !== "boss_baby_cyborg" && !String(bullet.ownerId).startsWith("clone_") && !String(bullet.ownerId).startsWith("spiral_") && bullet.character !== "tung_projectile";
         if (isPlayerOrTurretBullet && horde.boss && horde.boss.phase === "spiral_phase" && Array.isArray(horde.boss.spirals)) {
           let hitSpiral = false;
           for (let si = horde.boss.spirals.length - 1; si >= 0; si--) {
@@ -5319,8 +5424,9 @@ setInterval(() => {
     }
     if (deflected) continue;
 
-    // Friendly fire disabled in Horde Mode:
-    if (isHordeRoom) continue;
+    // Friendly fire disabled between players in Horde Mode, but enemy/boss/spiral bullets MUST hit players!
+    const isPlayerOrTurretShot = bullet.ownerId !== "boss_tung" && bullet.ownerId !== "boss_baby_cyborg" && !String(bullet.ownerId).startsWith("clone_") && !String(bullet.ownerId).startsWith("spiral_") && bullet.character !== "tung_projectile";
+    if (isHordeRoom && isPlayerOrTurretShot) continue;
     const hit = [...roomPlayers]
       .map((id) => players.get(id))
       .find((target) => {
@@ -5598,6 +5704,11 @@ setInterval(() => {
         laserTarget: horde.boss.laserTarget || null,
         stompState: horde.boss.stompState,
         stompTarget: horde.boss.stompTarget,
+        stompStartX: horde.boss.stompStartX != null ? Math.round(horde.boss.stompStartX * 10) / 10 : null,
+        stompStartY: horde.boss.stompStartY != null ? Math.round(horde.boss.stompStartY * 10) / 10 : null,
+        stompChargeUntil: horde.boss.stompChargeUntil || 0,
+        stompAirborneUntil: horde.boss.stompAirborneUntil || 0,
+        stompImpactUntil: horde.boss.stompImpactUntil || 0,
         stompWarnUntil: horde.boss.stompWarnUntil || 0,
         stompLandUntil: horde.boss.stompLandUntil || 0,
         stompRadius: horde.boss.stompRadius || 140,
